@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Station 3 Clique Inventory</title>
+<meta name="theme-color" content="#14284b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="S3 Inventory">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --navy:#14284b; --navy-2:#1f3a66; --teal:#1a8a8a; --orange:#e8742a;
+  --bg:#f3f5f8; --surface:#ffffff; --line:#dde2ea; --text:#14203a; --muted:#5d6a80;
+  --low-bg:#fdeee3; --ok:#1a8a8a;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1628; --surface:#132139; --line:#243554; --text:#e7ecf4; --muted:#96a3ba;
+    --navy:#0a1426; --navy-2:#1b2f52; --teal:#3cb7b3; --orange:#f08a45; --low-bg:#3a2415;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1628; --surface:#132139; --line:#243554; --text:#e7ecf4; --muted:#96a3ba;
+  --navy:#0a1426; --navy-2:#1b2f52; --teal:#3cb7b3; --orange:#f08a45; --low-bg:#3a2415;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 "Barlow",system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:880px;margin:0 auto;padding:0 16px 48px}
+
+header.top{background:var(--navy);color:#fff}
+header.top .wrap{padding-top:22px;padding-bottom:20px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:34px;line-height:1;margin:0;letter-spacing:.01em}
+h1 span{color:var(--orange)}
+.sync{font-size:13px;color:#b8c4da}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:18px;background:var(--navy-2);border-radius:10px;overflow:hidden}
+.stat{background:var(--navy);padding:12px 14px}
+.stat b{display:block;font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:28px;line-height:1.1}
+.stat small{color:#b8c4da;font-size:13px}
+.stat.low b{color:var(--orange)}
+
+nav.tabs{display:flex;gap:4px;margin:18px 0 14px;border-bottom:2px solid var(--line);overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:0 0 auto}
+nav.tabs button{background:none;border:0;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+nav.tabs button[aria-selected="true"]{color:var(--text);border-color:var(--teal)}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar input,.toolbar select{flex:1 1 160px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.btn{border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--teal);color:#fff;white-space:nowrap}
+.btn.alt{background:var(--orange)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:#c23b22;border:1px solid currentColor}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+
+.list{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.low{background:var(--low-bg)}
+.name{font-weight:600;cursor:pointer;background:none;border:0;padding:0;text-align:left}
+.name:hover{text-decoration:underline}
+.meta{font-size:13px;color:var(--muted)}
+.meta .flag{color:var(--orange);font-weight:600}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:20px;line-height:1;cursor:pointer}
+.qty output{min-width:34px;text-align:center;font-family:"Barlow Condensed",sans-serif;font-size:24px;font-weight:700}
+.val{text-align:right;min-width:72px}
+.val b{display:block}
+.restock{font-size:13px;padding:6px 10px}
+.group{padding:8px 14px;font-size:13px;font-weight:600;color:var(--muted);background:var(--bg);border-top:1px solid var(--line)}
+.group:first-child{border-top:0}
+
+.empty{padding:36px 20px;text-align:center;color:var(--muted)}
+.empty p{margin:0 0 14px}
+
+.logrow{display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+.logrow:first-child{border-top:0}
+.month{display:flex;justify-content:space-between;padding:8px 14px;font-weight:600;font-size:14px;background:var(--bg);border-top:1px solid var(--line)}
+.month:first-child{border-top:0}
+#reader{width:100%;min-height:200px;background:#000;border-radius:8px;overflow:hidden}
+#reader video{width:100%!important;height:auto!important;display:block}
+#loginDlg p{margin:0 0 6px}
+.err{color:#c23b22;font-size:14px;min-height:20px;margin:8px 0 0}
+.signout{background:none;border:0;color:#b8c4da;text-decoration:underline;cursor:pointer;font-size:13px;padding:0;margin-left:8px}
+.scanstatus{font-size:14px;color:var(--muted);margin:10px 0 0;min-height:20px}
+.inline{display:flex;gap:8px}
+.inline input{flex:1;min-width:0}
+.filebtn{position:relative;overflow:hidden;display:inline-flex;align-items:center}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.hitqty{display:flex;align-items:center;gap:14px;margin:6px 0 4px}
+.hitqty output{font-family:"Barlow Condensed",sans-serif;font-size:44px;font-weight:700;min-width:60px;text-align:center}
+.hitqty button{width:52px;height:52px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:26px;cursor:pointer}
+.divider{border:0;border-top:1px solid var(--line);margin:16px 0 4px}
+.countbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.countbar .btn{font-size:17px;padding:12px 18px}
+.progress{font-size:14px;color:var(--muted)}
+.progress b{color:var(--text)}
+.linkbtn{background:none;border:0;padding:0;color:var(--teal);text-decoration:underline;cursor:pointer;font-size:14px}
+.crow{display:grid;grid-template-columns:1fr 84px 84px;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+.crow:first-child{border-top:0}
+.crow.head{font-size:13px;color:var(--muted);font-weight:600;background:var(--bg);padding-top:8px;padding-bottom:8px}
+.crow input{width:100%;padding:9px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);text-align:center;font-size:17px}
+.crow.done{background:color-mix(in srgb, var(--teal) 10%, var(--surface))}
+.crow .check{color:var(--teal);font-weight:700;margin-left:4px}
+.bigcount{display:flex;align-items:center;gap:12px;margin:8px 0}
+.bigcount input{flex:1;min-width:0;text-align:center;font-family:"Barlow Condensed",sans-serif;font-size:44px;font-weight:700;padding:6px}
+.bigcount button{width:56px;height:56px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:28px;cursor:pointer}
+.badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--orange);color:#fff;font-size:12px;line-height:20px;text-align:center}
+.shoprow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.shoprow:first-child{border-top:0}
+.tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--low-bg);color:var(--orange);white-space:nowrap}
+.tag.manual{background:transparent;color:var(--teal);border:1px solid var(--teal)}
+.shopbtns{display:flex;gap:6px;align-items:center}
+.del{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:0;text-decoration:underline}
+
+dialog{border:0;border-radius:12px;padding:0;width:min(440px,calc(100% - 24px));background:var(--surface);color:var(--text);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(10,20,40,.55)}
+dialog form{padding:20px}
+dialog h2{font-family:"Barlow Condensed",sans-serif;font-size:26px;margin:0 0 14px}
+label{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
+label small{font-weight:400;color:var(--muted)}
+dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.actions .spacer{flex:1}
+.hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+.banner{margin:14px 0 0;padding:10px 14px;border-radius:8px;background:var(--low-bg);font-size:14px}
+[hidden]{display:none!important}
+
+@media (max-width:560px){
+  .stats b{font-size:22px}
+  .row{grid-template-columns:1fr auto;}
+  .val{grid-column:1 / -1;text-align:left;display:flex;gap:10px;align-items:center;justify-content:space-between}
+  .val b{display:inline}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Station 3 Clique <span>Inventory</span></h1>
+      <div class="sync"><span id="sync">Connecting…</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sValue">$0.00</b><small>Stock on hand</small></div>
+      <div class="stat low"><b id="sLow">0</b><small>Running low</small></div>
+      <div class="stat"><b id="sSpent">$0.00</b><small>Spent this month</small></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="banner" hidden></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="stock">Stock</button>
+    <button role="tab" aria-selected="false" data-tab="count">Take inventory</button>
+    <button role="tab" aria-selected="false" data-tab="shop">Shopping list<span class="badge" id="shopCount" hidden></span></button>
+    <button role="tab" aria-selected="false" data-tab="log">Purchases</button>
+  </nav>
+
+  <section id="tab-stock">
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search items" aria-label="Search items">
+      <select id="filter" aria-label="Filter">
+        <option value="all">All items</option>
+        <option value="low">Running low</option>
+      </select>
+      <button class="btn alt" id="scanBtn">Scan</button>
+      <button class="btn ghost" id="scanType" aria-label="Type a barcode">Type code</button>
+      <button class="btn" id="addBtn">Add item</button>
+    </div>
+    <div class="list" id="stockList"></div>
+  </section>
+
+  <section id="tab-count" hidden>
+    <div class="countbar">
+      <button class="btn alt" id="countScanBtn">Scan to count</button>
+      <span class="progress" id="countProgress"></span>
+      <button class="linkbtn" id="countReset">Start a new count</button>
+    </div>
+    <div class="toolbar">
+      <input id="countSearch" type="search" placeholder="Search items" aria-label="Search items to count">
+      <select id="countFilter" aria-label="Filter">
+        <option value="all">All items</option>
+        <option value="todo">Not counted yet</option>
+      </select>
+    </div>
+    <div class="list" id="countList"></div>
+    <p class="hint">Type what's on the shelf and it saves as soon as you move to the next box. Par is how many you want on hand when fully stocked.</p>
+  </section>
+
+  <section id="tab-shop" hidden>
+    <div class="toolbar">
+      <button class="btn" id="shopAddBtn">Add to list</button>
+      <button class="btn ghost" id="shopCopyBtn">Copy list</button>
+    </div>
+    <div class="list" id="shopList"></div>
+    <p class="hint">Anything at or below its low number shows up here on its own. Mark it bought to log the cost and restock it.</p>
+  </section>
+
+  <section id="tab-log" hidden>
+    <div class="toolbar">
+      <button class="btn alt" id="logBtn">Log a purchase</button>
+    </div>
+    <div class="list" id="logList"></div>
+  </section>
+</main>
+
+<!-- Item dialog -->
+<dialog id="itemDlg">
+  <form method="dialog" id="itemForm">
+    <h2 id="itemTitle">Add item</h2>
+    <label for="iName">Item name</label>
+    <input id="iName" required maxlength="60" autocomplete="off">
+    <label for="iCat">Category <small>optional</small></label>
+    <input id="iCat" list="cats" maxlength="40" autocomplete="off" placeholder="Snacks, drinks, supplies…">
+    <datalist id="cats"></datalist>
+    <label for="iBarcode">Barcode <small>optional</small></label>
+    <div class="inline">
+      <input id="iBarcode" maxlength="64" autocomplete="off" inputmode="numeric">
+      <button type="button" class="btn ghost" id="iScan">Scan</button>
+    </div>
+    <p class="hint" id="barcodeWarn" hidden></p>
+    <div class="two">
+      <div><label for="iQty">On hand</label><input id="iQty" type="number" min="0" step="1" value="0" inputmode="numeric"></div>
+      <div><label for="iPar">Par <small>optional</small></label><input id="iPar" type="number" min="0" step="1" inputmode="numeric" placeholder="Fully stocked"></div>
+    </div>
+    <label for="iLow">Reorder at <small>optional</small></label>
+    <input id="iLow" type="number" min="0" step="1" inputmode="numeric" placeholder="Leave blank to reorder anytime it's under par">
+    <div class="two">
+      <div><label for="iCost">Cost each <small>optional</small></label><input id="iCost" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal"></div>
+      <div><label for="iPrice">Sell price <small>optional</small></label><input id="iPrice" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal"></div>
+    </div>
+    <p class="hint" id="marginHint"></p>
+    <div class="actions">
+      <button type="button" class="btn danger" id="iDelete" hidden>Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn" id="iSave">Save item</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Scanner dialog -->
+<dialog id="scanDlg">
+  <form method="dialog" id="scanForm">
+    <h2>Scan a barcode</h2>
+    <div id="reader"></div>
+    <p class="scanstatus" id="scanStatus"></p>
+    <div class="actions" style="justify-content:flex-start;margin-top:8px">
+      <button type="button" class="btn ghost" id="scanRetry">Take a photo instead</button>
+    </div>
+    <div id="scanManualWrap">
+      <label for="scanManual">Or type the number</label>
+      <div class="inline">
+        <input id="scanManual" inputmode="numeric" autocomplete="off">
+        <button type="submit" class="btn">Look up</button>
+      </div>
+    </div>
+    <div class="actions"><button type="button" class="btn ghost" id="scanCancel">Cancel</button></div>
+  </form>
+</dialog>
+
+
+<!-- Count dialog (scan to count) -->
+<dialog id="countDlg">
+  <form method="dialog" id="countForm">
+    <h2 id="countName">Item</h2>
+    <p class="meta" id="countMeta"></p>
+    <label for="countQty">How many are on the shelf?</label>
+    <div class="bigcount">
+      <button type="button" id="countDec" aria-label="One less">−</button>
+      <input id="countQty" type="number" min="0" step="1" inputmode="numeric">
+      <button type="button" id="countInc" aria-label="One more">+</button>
+    </div>
+    <label for="countPar">Par <small>optional</small></label>
+    <input id="countPar" type="number" min="0" step="1" inputmode="numeric" placeholder="How many when fully stocked">
+    <div class="actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="button" class="btn ghost" id="countSaveDone">Save</button>
+      <button type="submit" class="btn alt">Save and scan next</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Scan found dialog -->
+<dialog id="hitDlg">
+  <form method="dialog">
+    <h2 id="hitName">Item</h2>
+    <div class="meta" id="hitMeta"></div>
+    <div class="hitqty">
+      <button type="button" id="hitDec" aria-label="Remove one">−</button>
+      <output id="hitQty">0</output>
+      <button type="button" id="hitInc" aria-label="Add one">+</button>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn ghost" id="hitEdit">Edit</button>
+      <button type="button" class="btn ghost" id="hitList">Add to list</button>
+      <button type="button" class="btn alt" id="hitBuy">Restock</button>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn ghost" id="hitAgain">Scan another</button>
+      <button type="button" class="btn" data-close>Done</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Scan not found dialog -->
+<dialog id="missDlg">
+  <form method="dialog" id="missForm">
+    <h2>New barcode</h2>
+    <p class="meta" id="missCode"></p>
+    <button type="button" class="btn" id="missNew" style="width:100%">Add as a new item</button>
+    <hr class="divider">
+    <label for="missItem">Or attach it to an item you already have</label>
+    <select id="missItem"></select>
+    <div class="actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn">Attach barcode</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Shopping dialog -->
+<dialog id="shopDlg">
+  <form method="dialog" id="shopForm">
+    <h2>Add to shopping list</h2>
+    <label for="sItem">Item</label>
+    <select id="sItem"></select>
+    <div id="sNewWrap">
+      <label for="sName">New item name</label>
+      <input id="sName" maxlength="60" autocomplete="off">
+    </div>
+    <div class="two">
+      <div><label for="sQty">How many <small>optional</small></label><input id="sQty" type="number" min="1" step="1" inputmode="numeric"></div>
+      <div><label for="sNote">Note <small>optional</small></label><input id="sNote" maxlength="60" autocomplete="off" placeholder="Brand, size…"></div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn">Add to list</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Purchase dialog -->
+<dialog id="buyDlg">
+  <form method="dialog" id="buyForm">
+    <h2>Log a purchase</h2>
+    <label for="bItem">Item</label>
+    <select id="bItem" required></select>
+    <div class="two">
+      <div><label for="bQty">Quantity bought</label><input id="bQty" type="number" min="1" step="1" required inputmode="numeric"></div>
+      <div><label for="bTotal">Total paid</label><input id="bTotal" type="number" min="0" step="0.01" required inputmode="decimal" placeholder="0.00"></div>
+    </div>
+    <div class="two">
+      <div><label for="bDate">Date</label><input id="bDate" type="date" required></div>
+      <div><label for="bWhere">Store <small>optional</small></label><input id="bWhere" maxlength="40" autocomplete="off"></div>
+    </div>
+    <p class="hint" id="buyHint">Adds to stock and updates the item's cost each.</p>
+    <div class="actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn alt">Log purchase</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+// ================== Firebase settings (Station3 Inventory) ==================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBjLIMIHjhDO4mdIBQ3B568HluSluI2vBI",
+  authDomain: "station3-inventory.firebaseapp.com",
+  projectId: "station3-inventory",
+  storageBucket: "station3-inventory.firebasestorage.app",
+  messagingSenderId: "662377957169",
+  appId: "1:662377957169:web:e35d9b221bc503df9d9210"
+};
+// ===================================================================
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+(function(){
+  const $ = s => document.querySelector(s);
+  const money = n => (Number(n)||0).toLocaleString("en-US",{style:"currency",currency:"USD"});
+  const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const num = (v,d=0) => { const n = parseFloat(v); return isFinite(n) ? n : d; };
+  const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+
+  let db = null, items = [], buys = [], shop = [], editing = null, readOnly = false, shopTarget = null, newQtyPrefill = null;
+  const pending = new Map(); // itemId -> {qty, timer}
+
+  // ---------- Tabs ----------
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
+    ["stock","count","shop","log"].forEach(t=>$("#tab-"+t).hidden = b.dataset.tab!==t);
+    if(b.dataset.tab==="count") renderCount(true);
+  }));
+  document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>b.closest("dialog").close()));
+
+  function banner(msg){ const el=$("#banner"); el.textContent=msg; el.hidden=!msg; }
+  function setReadOnly(){
+    readOnly = true;
+    banner("You can view this inventory but not change it. ");
+    render();
+  }
+  async function write(fn){
+    if(!db || readOnly) return false;
+    try{ await fn(); return true; }
+    catch(e){
+      if(e && (e.code==="permission-denied" || e.code==="invalid_argument")){ banner("The database blocked that change. Check the Firestore rules."); }
+      else if(e && e.code==="quota_exceeded"){ banner("Storage is full. Delete some old purchases to make room."); }
+      else if(e && (e.code==="unavailable" || e.code==="deadline-exceeded")){
+        await new Promise(r=>setTimeout(r,600+Math.random()*600));
+        try{ await fn(); return true; }catch(_){ banner("Couldn't save. Check your connection and try again."); }
+      } else { banner("Couldn't save. Try again."); }
+      return false;
+    }
+  }
+
+  // ---------- Derived ----------
+  const qtyOf = it => pending.has(it.id) ? pending.get(it.id).qty : (it.qty||0);
+  // Needs restocking: at/below reorder point if set, otherwise under par, otherwise out
+  const isLow = it => {
+    const q = qtyOf(it), par = it.par||0, low = it.low||0;
+    if(low > 0) return q <= low;
+    if(par > 0) return q < par;
+    return q === 0;
+  };
+  const toPar = it => (it.par||0) > 0 ? Math.max(0, it.par - qtyOf(it)) : 0;
+  const flagOf = it => qtyOf(it)===0 ? "Out" : "Low";
+  function monthKey(d){ return String(d||"").slice(0,7); }
+
+  // ---------- Render ----------
+  function render(){
+    // stats
+    const value = items.reduce((s,it)=>s+qtyOf(it)*(it.unitCost||0),0);
+    const lowCount = items.filter(isLow).length;
+    const thisMonth = monthKey(today());
+    const spent = buys.filter(b=>monthKey(b.date)===thisMonth).reduce((s,b)=>s+(b.total||0),0);
+    $("#sValue").textContent = money(value);
+    $("#sLow").textContent = lowCount;
+    $("#sSpent").textContent = money(spent);
+
+    // category suggestions
+    const cats = [...new Set(items.map(i=>i.category).filter(Boolean))].sort();
+    $("#cats").innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join("");
+
+    $("#addBtn").disabled = !db || readOnly;
+    $("#scanBtn").disabled = !db;
+    $("#logBtn").disabled = !db || readOnly || items.length===0;
+
+    $("#shopAddBtn").disabled = !db || readOnly;
+    const n = shopEntries().length;
+    $("#shopCount").textContent = n; $("#shopCount").hidden = n===0;
+    renderStock(); renderCount(); renderShop(); renderLog();
+    if($("#hitDlg").open) refreshHit();
+  }
+
+  // Shopping list = manual entries + low items not already listed
+  function shopEntries(){
+    const listed = new Set(shop.filter(s=>s.itemId).map(s=>s.itemId));
+    const manual = shop.map(s=>{
+      const it = s.itemId && items.find(i=>i.id===s.itemId);
+      return {kind:"manual", id:s.id, itemId: it?it.id:null, name: it?it.name:(s.name||"Item"), qty:s.qty || (it?toPar(it):0), note:s.note, onHand: it?qtyOf(it):null};
+    });
+    const auto = items.filter(it=>isLow(it) && !listed.has(it.id))
+      .map(it=>({kind:"auto", id:"auto-"+it.id, itemId:it.id, name:it.name, qty:toPar(it)||null, note:"", onHand:qtyOf(it)}));
+    return [...auto, ...manual].sort((a,b)=>a.name.localeCompare(b.name));
+  }
+
+  function renderShop(){
+    const el = $("#shopList");
+    if(!db){ el.innerHTML = `<div class="empty"><p>Loading…</p></div>`; return; }
+    const list = shopEntries();
+    if(list.length===0){ el.innerHTML = `<div class="empty"><p>Nothing needed right now.</p></div>`; return; }
+    el.innerHTML = list.map(e=>{
+      const meta = [];
+      if(e.qty) meta.push(`Get ${e.qty}`);
+      if(e.onHand!==null) meta.push(`${e.onHand} on hand`);
+      if(e.note) meta.push(esc(e.note));
+      const tag = e.kind==="auto" ? `<span class="tag">${e.onHand===0?"Out":"Low"}</span>` : `<span class="tag manual">Added</span>`;
+      return `<div class="shoprow">
+        ${tag}
+        <div><b>${esc(e.name)}</b><div class="meta">${meta.join(", ")}</div></div>
+        ${readOnly?"":`<div class="shopbtns">
+          <button class="btn restock" data-act="gotit" data-id="${e.id}">Bought</button>
+          ${e.kind==="manual"?`<button class="del" data-act="unlist" data-id="${e.id}">Remove</button>`:""}
+        </div>`}
+      </div>`;
+    }).join("");
+  }
+
+  function renderStock(){
+    const q = $("#search").value.trim().toLowerCase();
+    const f = $("#filter").value;
+    let list = items.filter(it => (!q || (it.name+" "+(it.category||"")+" "+(it.barcode||"")).toLowerCase().includes(q)) && (f!=="low" || isLow(it)));
+    const el = $("#stockList");
+    if(!db){ el.innerHTML = `<div class="empty"><p>Loading inventory…</p></div>`; return; }
+    if(items.length===0){
+      el.innerHTML = `<div class="empty"><p>No items yet. Add the first thing you keep stocked.</p>${readOnly?"":`<button class="btn" data-act="add">Add item</button>`}</div>`;
+      return;
+    }
+    if(list.length===0){ el.innerHTML = `<div class="empty"><p>Nothing matches.</p></div>`; return; }
+
+    const groups = {};
+    list.forEach(it=>{ const g = it.category||"Uncategorized"; (groups[g] ||= []).push(it); });
+    const names = Object.keys(groups).sort((a,b)=> a==="Uncategorized"?1 : b==="Uncategorized"?-1 : a.localeCompare(b));
+    const showGroups = names.length>1;
+    let html = "";
+    names.forEach(g=>{
+      if(showGroups) html += `<div class="group">${esc(g)}</div>`;
+      groups[g].sort((a,b)=>a.name.localeCompare(b.name)).forEach(it=>{
+        const q = qtyOf(it), low = isLow(it);
+        const parts = [];
+        if(it.par) parts.push(`Par ${it.par}`);
+        if(it.unitCost) parts.push(`${money(it.unitCost)} each`);
+        if(it.price) parts.push(`sells ${money(it.price)}`);
+        if(low) parts.push(`<span class="flag">${flagOf(it)}</span>`);
+        html += `<div class="row${low?" low":""}">
+          <div><button class="name" data-act="edit" data-id="${it.id}">${esc(it.name)}</button>
+            <div class="meta">${parts.join(", ")||"&nbsp;"}</div></div>
+          <div class="qty">
+            <button data-act="dec" data-id="${it.id}" aria-label="Remove one ${esc(it.name)}" ${readOnly||q<=0?"disabled":""}>−</button>
+            <output>${q}</output>
+            <button data-act="inc" data-id="${it.id}" aria-label="Add one ${esc(it.name)}" ${readOnly?"disabled":""}>+</button>
+          </div>
+          <div class="val"><b>${it.unitCost?money(q*it.unitCost):""}</b>
+            ${readOnly?"":`<button class="btn ghost restock" data-act="buy" data-id="${it.id}">Restock</button>`}</div>
+        </div>`;
+      });
+    });
+    el.innerHTML = html;
+  }
+
+  function renderLog(){
+    const el = $("#logList");
+    if(!db){ el.innerHTML = `<div class="empty"><p>Loading…</p></div>`; return; }
+    if(buys.length===0){
+      el.innerHTML = `<div class="empty"><p>No purchases logged yet. Log one when you restock so costs stay current.</p></div>`;
+      return;
+    }
+    const byMonth = {};
+    buys.forEach(b=>{ (byMonth[monthKey(b.date)] ||= []).push(b); });
+    let html = "";
+    Object.keys(byMonth).sort().reverse().forEach(m=>{
+      const rows = byMonth[m];
+      const total = rows.reduce((s,b)=>s+(b.total||0),0);
+      const label = new Date(m+"-15").toLocaleDateString("en-US",{month:"long",year:"numeric"});
+      html += `<div class="month"><span>${esc(label)}</span><span>${money(total)}</span></div>`;
+      rows.forEach(b=>{
+        const d = new Date(b.date+"T12:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+        const each = b.qty ? money((b.total||0)/b.qty) : "";
+        html += `<div class="logrow">
+          <div><b>${esc(b.itemName)}</b> <span class="meta">x${b.qty}</span>
+            <div class="meta">${esc(d)}${b.where?`, ${esc(b.where)}`:""}, ${each} each</div></div>
+          <div style="text-align:right"><b>${money(b.total)}</b>
+            ${readOnly?"":`<div><button class="del" data-act="delbuy" data-id="${b.id}">Remove</button></div>`}</div>
+        </div>`;
+      });
+    });
+    el.innerHTML = html;
+  }
+
+  $("#search").addEventListener("input", renderStock);
+  $("#filter").addEventListener("change", renderStock);
+
+  // ---------- Actions ----------
+  document.addEventListener("click", e=>{
+    const b = e.target.closest("[data-act]"); if(!b) return;
+    const id = b.dataset.id, act = b.dataset.act;
+    const it = items.find(x=>x.id===id);
+    if(act!=="gotit") shopTarget = null;
+    if(act==="add") openItem(null);
+    else if(act==="edit" && it) openItem(it);
+    else if(act==="inc" && it) bump(it, +1);
+    else if(act==="dec" && it) bump(it, -1);
+    else if(act==="buy" && it) openBuy(it.id);
+    else if(act==="delbuy") removeBuy(id);
+    else if(act==="gotit") boughtFromList(id);
+    else if(act==="unlist") write(()=>db.doc("shopping/"+id).delete());
+  });
+  $("#addBtn").addEventListener("click", ()=>{ shopTarget=null; openItem(null); });
+  $("#logBtn").addEventListener("click", ()=>{ shopTarget=null; openBuy(null); });
+
+  function bump(it, d){
+    if(readOnly) return;
+    const cur = qtyOf(it), next = Math.max(0, cur+d);
+    const p = pending.get(it.id) || {};
+    clearTimeout(p.timer);
+    p.qty = next;
+    p.timer = setTimeout(async ()=>{
+      const final = pending.get(it.id)?.qty;
+      await write(()=>db.doc("items/"+it.id).update({qty: final, updatedAt: Date.now()}));
+      if(pending.get(it.id)?.qty===final) pending.delete(it.id);
+      render();
+    }, 700);
+    pending.set(it.id, p);
+    render();
+  }
+
+  // Item dialog
+  function updateMargin(){
+    const c = num($("#iCost").value), p = num($("#iPrice").value);
+    $("#marginHint").textContent = (c>0 && p>0) ? `Margin ${money(p-c)} each (${Math.round((p-c)/p*100)}%)` : "";
+  }
+  $("#iCost").addEventListener("input", updateMargin);
+  $("#iPrice").addEventListener("input", updateMargin);
+
+  function openItem(it){
+    editing = it;
+    $("#itemTitle").textContent = it ? "Edit item" : "Add item";
+    $("#iName").value = it?.name || "";
+    $("#iCat").value = it?.category || "";
+    $("#iQty").value = it ? qtyOf(it) : 0;
+    $("#iLow").value = it?.low ? it.low : "";
+    $("#iPar").value = it?.par ? it.par : "";
+    $("#iCost").value = it?.unitCost ? it.unitCost.toFixed(2) : "";
+    $("#iPrice").value = it?.price ? it.price.toFixed(2) : "";
+    $("#iBarcode").value = it?.barcode || "";
+    checkBarcodeDup();
+    $("#iDelete").hidden = !it;
+    $("#iSave").textContent = it ? "Save changes" : "Add item";
+    updateMargin();
+    $("#itemDlg").showModal();
+    $("#iName").focus();
+  }
+
+  // ---------- Barcode scanning ----------
+  const normCode = v => String(v||"").replace(/\s+/g,"").slice(0,64);
+  let scanner = null, scanMode = "lookup", scanBusy = false, hitId = null, missCode = null;
+
+  function checkBarcodeDup(){
+    const code = normCode($("#iBarcode").value);
+    const other = code && items.find(i=>i.barcode===code && (!editing || i.id!==editing.id));
+    $("#barcodeWarn").hidden = !other;
+    if(other) $("#barcodeWarn").textContent = `That barcode is already on ${other.name}.`;
+  }
+  $("#iBarcode").addEventListener("input", checkBarcodeDup);
+
+  function lib(){ return window.__Html5QrcodeLibrary__ || null; }
+
+  // Scanning uses the phone's own camera app (live camera is blocked inside the viewer).
+  const photoIn = document.createElement("input");
+  photoIn.type = "file"; photoIn.accept = "image/*"; photoIn.setAttribute("capture","environment");
+  photoIn.hidden = true; document.body.appendChild(photoIn);
+
+  let live = null;
+  async function stopLive(){
+    if(live){ try{ if(live.isScanning) await live.stop(); }catch(_){} try{ live.clear(); }catch(_){} live = null; }
+  }
+  function takePhoto(){ photoIn.value = ""; photoIn.click(); }
+  async function startScan(mode){
+    scanMode = mode; scanBusy = false;
+    $("#scanManual").value = "";
+    $("#reader").hidden = false;
+    showScanDlg("Starting camera…", false);
+    const L = lib();
+    if(!L){ $("#reader").hidden = true; $("#scanStatus").textContent = "Scanner didn't load. Take a photo or type the number."; return; }
+    const F = L.Html5QrcodeSupportedFormats;
+    const formats = [F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.QR_CODE].filter(x=>x!==undefined);
+    try{
+      live = new L.Html5Qrcode("reader",{formatsToSupport:formats, verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
+      await live.start({facingMode:"environment"},
+        {fps:12, qrbox:(w,h)=>({width:Math.min(300,Math.floor(w*0.85)), height:Math.min(160,Math.floor(h*0.6))})},
+        code=>gotCode(code), ()=>{});
+      $("#scanStatus").textContent = "Hold the barcode inside the box.";
+    }catch(err){
+      await stopLive();
+      $("#reader").hidden = true;
+      const denied = err && /NotAllowed|Permission/i.test(String(err.name||err));
+      $("#scanStatus").textContent = denied
+        ? "Camera access is turned off for this site. Allow the camera in your browser settings, or take a photo instead."
+        : "Couldn't start the camera. Take a photo or type the number instead.";
+    }
+  }
+
+  function showScanDlg(msg, reading){
+    $("#scanStatus").textContent = msg;
+    $("#scanRetry").hidden = !!reading;
+    $("#scanManualWrap").hidden = !!reading;
+    if(!$("#scanDlg").open) $("#scanDlg").showModal();
+  }
+  $("#scanDlg").addEventListener("close", ()=>{ stopLive(); });
+
+  async function resized(file, maxSide){
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+    const scale = Math.min(1, maxSide/Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth*scale); c.height = Math.round(img.naturalHeight*scale);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(img.src);
+    const blob = await new Promise(r=>c.toBlob(r,"image/jpeg",0.92));
+    return {canvas:c, file:new File([blob],"scan.jpg",{type:"image/jpeg"})};
+  }
+
+  async function decodePhoto(file){
+    // 1) Native detector (Android Chrome, some iOS)
+    if("BarcodeDetector" in window){
+      try{
+        const det = new BarcodeDetector();
+        const {canvas} = await resized(file, 1600);
+        const found = await det.detect(canvas);
+        if(found && found[0]) return found[0].rawValue;
+      }catch(_){}
+    }
+    // 2) Library, trying a few sizes (big phone photos often fail at full size)
+    const L = lib(); if(!L) throw new Error("nolib");
+    for(const side of [1280, 1800, 900]){
+      try{
+        const {file:f} = await resized(file, side);
+        const r = new L.Html5Qrcode("reader",{verbose:false});
+        try{ return await r.scanFile(f,false); } finally { try{ r.clear(); }catch(_){} }
+      }catch(_){}
+    }
+    throw new Error("notfound");
+  }
+
+  photoIn.addEventListener("change", async ()=>{
+    const f = photoIn.files[0]; if(!f) return;
+    await stopLive(); $("#reader").hidden = true;
+    showScanDlg("Reading barcode…", true);
+    try{ gotCode(await decodePhoto(f)); }
+    catch(_){ $("#scanRetry").textContent = "Take another photo"; showScanDlg("Couldn't read a barcode in that photo. Get close so the barcode fills most of the picture, hold steady, and use good light."); }
+  });
+
+  async function gotCode(raw){
+    const code = normCode(raw);
+    if(!code || scanBusy) return;
+    scanBusy = true;
+    if(navigator.vibrate) try{ navigator.vibrate(60); }catch(_){}
+    await stopLive();
+    if($("#scanDlg").open) $("#scanDlg").close();
+    if(scanMode==="field"){ $("#iBarcode").value = code; checkBarcodeDup(); return; }
+    const it = items.find(i=>i.barcode===code);
+    if(scanMode==="count"){ if(it) showCount(it); else showMiss(code); return; }
+    if(it) showHit(it); else showMiss(code);
+  }
+
+  $("#scanRetry").addEventListener("click", async ()=>{ await stopLive(); takePhoto(); });
+  $("#scanForm").addEventListener("submit", e=>{ e.preventDefault(); const v=$("#scanManual").value; if(normCode(v)){ scanBusy=false; gotCode(v); } });
+  $("#scanCancel").addEventListener("click", ()=>$("#scanDlg").close());
+  $("#scanBtn").addEventListener("click", ()=>startScan("lookup"));
+  $("#iScan").addEventListener("click", ()=>startScan("field"));
+  $("#scanType").addEventListener("click", ()=>{ scanMode="lookup"; $("#scanManual").value=""; $("#reader").hidden = true; $("#scanRetry").textContent = "Take a photo instead"; showScanDlg("Type the barcode number, or use a Bluetooth scanner."); $("#scanManual").focus(); });
+
+  function showHit(it){
+    hitId = it.id;
+    refreshHit();
+    $("#hitDlg").showModal();
+  }
+  function refreshHit(){
+    const it = items.find(i=>i.id===hitId);
+    if(!it){ if($("#hitDlg").open) $("#hitDlg").close(); return; }
+    $("#hitName").textContent = it.name;
+    const q = qtyOf(it);
+    $("#hitQty").textContent = q;
+    const bits = [];
+    if(it.par) bits.push(`Par ${it.par}`);
+    if(it.unitCost) bits.push(`${money(it.unitCost)} each`);
+    if(it.price) bits.push(`sells ${money(it.price)}`);
+    if(isLow(it)) bits.push(flagOf(it));
+    $("#hitMeta").textContent = bits.join(", ");
+    $("#hitDec").disabled = readOnly || q<=0;
+    $("#hitInc").disabled = readOnly;
+    ["#hitEdit","#hitList","#hitBuy"].forEach(s=>$(s).disabled = readOnly);
+  }
+  const hitItem = () => items.find(i=>i.id===hitId);
+  $("#hitInc").addEventListener("click", ()=>{ const it=hitItem(); if(it) bump(it,+1); });
+  $("#hitDec").addEventListener("click", ()=>{ const it=hitItem(); if(it) bump(it,-1); });
+  $("#hitEdit").addEventListener("click", ()=>{ const it=hitItem(); $("#hitDlg").close(); if(it){ shopTarget=null; openItem(it); } });
+  $("#hitBuy").addEventListener("click", ()=>{ const it=hitItem(); $("#hitDlg").close(); if(it){ shopTarget=null; openBuy(it.id); } });
+  $("#hitList").addEventListener("click", async ()=>{
+    const it=hitItem(); if(!it) return;
+    if(shop.some(s=>s.itemId===it.id)){ $("#hitList").textContent="Already listed"; return; }
+    const ok = await write(()=>db.collection("shopping").add({itemId:it.id, name:"", qty:0, note:"", createdAt:Date.now()}));
+    if(ok) $("#hitList").textContent="On the list";
+  });
+  $("#hitDlg").addEventListener("close", ()=>{ $("#hitList").textContent="Add to list"; });
+  $("#hitAgain").addEventListener("click", ()=>{ $("#hitDlg").close(); startScan("lookup"); });
+
+  function showMiss(code){
+    missCode = code;
+    $("#missCode").textContent = `Barcode ${code} isn't in the inventory yet.`;
+    const sorted = [...items].filter(i=>!i.barcode).sort((a,b)=>a.name.localeCompare(b.name));
+    $("#missItem").innerHTML = sorted.length ? sorted.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("") : `<option value="">No items without a barcode</option>`;
+    $("#missItem").disabled = !sorted.length || readOnly;
+    $("#missNew").disabled = readOnly;
+    $("#missDlg").showModal();
+  }
+  $("#missNew").addEventListener("click", ()=>{
+    $("#missDlg").close(); shopTarget=null; openItem(null);
+    $("#iBarcode").value = missCode; checkBarcodeDup();
+  });
+  $("#missForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const id = $("#missItem").value; if(!id) return;
+    $("#missDlg").close();
+    const ok = await write(()=>db.doc("items/"+id).update({barcode:missCode, updatedAt:Date.now()}));
+    if(ok){ const it=items.find(i=>i.id===id); if(it) showHit({...it, barcode:missCode}); }
+  });
+
+  // ---------- Take inventory ----------
+  let countStart = 0;
+  try{ countStart = Number(localStorage.getItem("s3-countStart")) || 0; }catch(_){}
+  function setCountStart(t){ countStart = t; try{ localStorage.setItem("s3-countStart", String(t)); }catch(_){} }
+  const countedNow = it => countStart && (it.countedAt||0) >= countStart;
+  let countDirty = false;
+
+  function renderCount(force){
+    if($("#tab-count").hidden && !force) return;
+    const el = $("#countList");
+    // Don't redraw while someone is typing a count
+    if(!force && el.contains(document.activeElement)){ countDirty = true; return; }
+    countDirty = false;
+    const done = items.filter(countedNow).length;
+    $("#countProgress").innerHTML = countStart
+      ? `<b>${done} of ${items.length}</b> counted this round`
+      : `Scan or type counts below`;
+    $("#countScanBtn").disabled = !db || readOnly;
+    if(!db){ el.innerHTML = `<div class="empty"><p>Loading…</p></div>`; return; }
+    if(items.length===0){ el.innerHTML = `<div class="empty"><p>No items yet. Tap Scan to count and add things as you scan them.</p></div>`; return; }
+    const q = $("#countSearch").value.trim().toLowerCase();
+    const f = $("#countFilter").value;
+    const list = items.filter(it => (!q || (it.name+" "+(it.category||"")+" "+(it.barcode||"")).toLowerCase().includes(q)) && (f!=="todo" || !countedNow(it)))
+      .sort((a,b)=> (a.category||"~").localeCompare(b.category||"~") || a.name.localeCompare(b.name));
+    if(list.length===0){ el.innerHTML = `<div class="empty"><p>${f==="todo"?"Everything's been counted.":"Nothing matches."}</p></div>`; return; }
+    el.innerHTML = `<div class="crow head"><span>Item</span><span style="text-align:center">On shelf</span><span style="text-align:center">Par</span></div>` +
+      list.map(it=>{
+        const last = it.countedAt ? new Date(it.countedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : "never";
+        return `<div class="crow${countedNow(it)?" done":""}">
+          <div><b>${esc(it.name)}</b>${countedNow(it)?'<span class="check" aria-label="Counted">✓</span>':""}
+            <div class="meta">Last counted ${esc(last)}</div></div>
+          <input type="number" min="0" step="1" inputmode="numeric" data-count="${it.id}" value="${qtyOf(it)}" aria-label="${esc(it.name)} on shelf" ${readOnly?"disabled":""}>
+          <input type="number" min="0" step="1" inputmode="numeric" data-par="${it.id}" value="${it.par||""}" placeholder="–" aria-label="${esc(it.name)} par" ${readOnly?"disabled":""}>
+        </div>`;
+      }).join("");
+  }
+
+  $("#countSearch").addEventListener("input", ()=>renderCount(true));
+  $("#countFilter").addEventListener("change", ()=>renderCount(true));
+  $("#countReset").addEventListener("click", ()=>{
+    if(countStart && !confirm("Start a new count? Checkmarks reset, counts stay.")) return;
+    setCountStart(Date.now()); renderCount(true);
+  });
+  $("#countList").addEventListener("change", async e=>{
+    const t = e.target;
+    if(t.dataset.count){
+      const it = items.find(i=>i.id===t.dataset.count); if(!it) return;
+      if(!countStart) setCountStart(Date.now());
+      const v = Math.max(0, Math.round(num(t.value, qtyOf(it))));
+      pending.delete(it.id);
+      await write(()=>db.doc("items/"+it.id).update({qty:v, countedAt:Date.now(), updatedAt:Date.now()}));
+    } else if(t.dataset.par){
+      const it = items.find(i=>i.id===t.dataset.par); if(!it) return;
+      const v = Math.max(0, Math.round(num(t.value, 0)));
+      await write(()=>db.doc("items/"+it.id).update({par:v, updatedAt:Date.now()}));
+    }
+  });
+  $("#countList").addEventListener("keydown", e=>{
+    if(e.key!=="Enter" || e.target.tagName!=="INPUT") return;
+    e.preventDefault();
+    const inputs = [...$("#countList").querySelectorAll("input[data-count]")];
+    const i = inputs.indexOf(e.target);
+    if(i>=0 && inputs[i+1]){ inputs[i+1].focus(); inputs[i+1].select(); } else e.target.blur();
+  });
+  $("#countList").addEventListener("focusout", ()=>{ setTimeout(()=>{ if(countDirty && !$("#countList").contains(document.activeElement)) renderCount(); },0); });
+  $("#countList").addEventListener("focusin", e=>{ if(e.target.tagName==="INPUT") e.target.select(); });
+
+  let countId = null;
+  function showCount(it){
+    countId = it.id;
+    if(!countStart) setCountStart(Date.now());
+    $("#countName").textContent = it.name;
+    const bits = [`App shows ${qtyOf(it)}`];
+    if(it.countedAt) bits.push(`last counted ${new Date(it.countedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"})}`);
+    $("#countMeta").textContent = bits.join(", ");
+    $("#countQty").value = qtyOf(it);
+    $("#countPar").value = it.par || "";
+    $("#countDlg").showModal();
+    $("#countQty").focus(); $("#countQty").select();
+  }
+  $("#countInc").addEventListener("click", ()=>{ $("#countQty").value = Math.max(0, Math.round(num($("#countQty").value))+1); });
+  $("#countDec").addEventListener("click", ()=>{ $("#countQty").value = Math.max(0, Math.round(num($("#countQty").value))-1); });
+  async function saveCount(){
+    const it = items.find(i=>i.id===countId); if(!it) return false;
+    const body = { qty: Math.max(0, Math.round(num($("#countQty").value, qtyOf(it)))), countedAt: Date.now(), updatedAt: Date.now() };
+    const par = $("#countPar").value.trim();
+    body.par = par==="" ? 0 : Math.max(0, Math.round(num(par)));
+    pending.delete(it.id);
+    $("#countDlg").close();
+    return write(()=>db.doc("items/"+it.id).update(body));
+  }
+  $("#countForm").addEventListener("submit", async e=>{ e.preventDefault(); await saveCount(); startScan("count"); });
+  $("#countSaveDone").addEventListener("click", ()=>saveCount());
+  $("#countScanBtn").addEventListener("click", ()=>startScan("count"));
+
+  // Shopping list
+  function openShop(){
+    const sorted = [...items].sort((a,b)=>a.name.localeCompare(b.name));
+    $("#sItem").innerHTML = `<option value="">New item…</option>` + sorted.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("");
+    $("#sItem").value = ""; $("#sName").value = ""; $("#sQty").value = ""; $("#sNote").value = "";
+    $("#sNewWrap").hidden = false;
+    $("#shopDlg").showModal();
+    $("#sItem").focus();
+  }
+  $("#sItem").addEventListener("change", ()=>{ $("#sNewWrap").hidden = !!$("#sItem").value; });
+  $("#shopAddBtn").addEventListener("click", openShop);
+  $("#shopForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const itemId = $("#sItem").value, name = $("#sName").value.trim();
+    if(!itemId && !name){ $("#sName").focus(); return; }
+    const q = Math.round(num($("#sQty").value));
+    $("#shopDlg").close();
+    await write(()=>db.collection("shopping").add({
+      itemId: itemId||"", name: itemId?"":name, qty: q>0?q:0, note: $("#sNote").value.trim(), createdAt: Date.now()
+    }));
+  });
+  $("#shopCopyBtn").addEventListener("click", async ()=>{
+    const list = shopEntries();
+    const text = list.length ? "Station 3 shopping list\n" + list.map(e=>"- "+e.name+(e.qty?" x"+e.qty:"")+(e.note?" ("+e.note+")":"")).join("\n") : "Nothing needed right now.";
+    try{ await navigator.clipboard.writeText(text); $("#shopCopyBtn").textContent="Copied"; }
+    catch(_){ prompt("Copy the list:", text); }
+    setTimeout(()=>$("#shopCopyBtn").textContent="Copy list",1500);
+  });
+  function boughtFromList(id){
+    const e = shopEntries().find(x=>x.id===id); if(!e) return;
+    shopTarget = e.kind==="manual" ? e.id : null;
+    if(e.itemId){ openBuy(e.itemId); if(e.qty) { $("#bQty").value = e.qty; updateBuyHint(); } }
+    else { newQtyPrefill = e.qty||0; openItem(null); $("#iName").value = e.name; $("#iQty").value = newQtyPrefill; $("#iCost").focus(); }
+  }
+  async function clearShopTarget(t){
+    if(t) await write(()=>db.doc("shopping/"+t).delete());
+  }
+
+  $("#itemForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const name = $("#iName").value.trim(); if(!name) return;
+    const body = {
+      name,
+      category: $("#iCat").value.trim(),
+      qty: Math.max(0, Math.round(num($("#iQty").value))),
+      low: Math.max(0, Math.round(num($("#iLow").value))),
+      par: Math.max(0, Math.round(num($("#iPar").value))),
+      unitCost: Math.max(0, Math.round(num($("#iCost").value)*100)/100),
+      price: Math.max(0, Math.round(num($("#iPrice").value)*100)/100),
+      barcode: normCode($("#iBarcode").value),
+      updatedAt: Date.now()
+    };
+    if(!editing || body.qty !== qtyOf(editing)) body.countedAt = Date.now();
+    const tgt = shopTarget; shopTarget = null;
+    $("#itemDlg").close();
+    if(editing){
+      pending.delete(editing.id);
+      await write(()=>db.doc("items/"+editing.id).update(body));
+    } else {
+      body.createdAt = Date.now();
+      const ok = await write(()=>db.collection("items").add(body));
+      if(ok) await clearShopTarget(tgt);
+    }
+  });
+
+  $("#iDelete").addEventListener("click", async ()=>{
+    if(!editing) return;
+    if(!confirm(`Delete ${editing.name}? Its purchase history stays in the log.`)) return;
+    const id = editing.id;
+    $("#itemDlg").close();
+    await write(()=>db.doc("items/"+id).delete());
+  });
+
+  // Purchase dialog
+  function openBuy(itemId){
+    const sorted = [...items].sort((a,b)=>a.name.localeCompare(b.name));
+    $("#bItem").innerHTML = sorted.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("");
+    if(itemId) $("#bItem").value = itemId;
+    $("#bQty").value = ""; $("#bTotal").value = ""; $("#bWhere").value = "";
+    $("#bDate").value = today();
+    updateBuyHint();
+    $("#buyDlg").showModal();
+    $("#bQty").focus();
+  }
+  function updateBuyHint(){
+    const q = num($("#bQty").value), t = num($("#bTotal").value);
+    $("#buyHint").textContent = (q>0 && t>0) ? `${money(t/q)} each. Adds ${q} to stock and updates the item's cost.` : "Adds to stock and updates the item's cost each.";
+  }
+  $("#bQty").addEventListener("input", updateBuyHint);
+  $("#bTotal").addEventListener("input", updateBuyHint);
+
+  $("#buyForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const it = items.find(x=>x.id===$("#bItem").value); if(!it) return;
+    const qty = Math.round(num($("#bQty").value)), total = Math.round(num($("#bTotal").value)*100)/100;
+    if(qty<1) return;
+    const tgt = shopTarget; shopTarget = null;
+    $("#buyDlg").close();
+    const ok = await write(()=>db.collection("purchases").add({
+      itemId: it.id, itemName: it.name, qty, total,
+      date: $("#bDate").value || today(), where: $("#bWhere").value.trim(), createdAt: Date.now()
+    }));
+    if(!ok) return;
+    const newQty = qtyOf(it) + qty;
+    pending.delete(it.id);
+    await write(()=>db.doc("items/"+it.id).update({
+      qty: newQty, unitCost: Math.round(total/qty*100)/100, updatedAt: Date.now()
+    }));
+    await clearShopTarget(tgt);
+  });
+
+  async function removeBuy(id){
+    const b = buys.find(x=>x.id===id); if(!b) return;
+    if(!confirm(`Remove this ${b.itemName} purchase from the log? Stock count won't change.`)) return;
+    await write(()=>db.doc("purchases/"+id).delete());
+  }
+
+  // ---------- Data (Firebase) ----------
+  render();
+  const configured = FIREBASE_CONFIG && FIREBASE_CONFIG.projectId;
+  if(!configured){
+    $("#sync").textContent = "Not set up";
+    $("#stockList").innerHTML = `<div class="empty"><p>Paste your Firebase settings into index.html to finish setup.</p></div>`;
+    return;
+  }
+  const app = initializeApp(FIREBASE_CONFIG);
+  const fs = getFirestore(app);
+
+  // Small adapter so the rest of the app keeps the same calls
+  const wrapQ = q => ({
+    onSnapshot: (next, err) => onSnapshot(q, next, err),
+    orderBy: (f, d) => wrapQ(query(q, orderBy(f, d||"asc"))),
+    limit: n => wrapQ(query(q, limit(n)))
+  });
+  const adapter = {
+    collection: name => ({ ...wrapQ(collection(fs, name)), add: data => addDoc(collection(fs, name), data) }),
+    doc: path => { const ref = doc(fs, path); return { update: d => updateDoc(ref, d), delete: () => deleteDoc(ref) }; }
+  };
+
+  db = adapter;
+  $("#sync").textContent = "Live, shared with the crew";
+  const fail = e => {
+    if(e && e.code==="permission-denied") banner("The database is blocking the app. Check the Firestore rules.");
+    else banner("Lost connection to the inventory. Reload the page.");
+  };
+  db.collection("items").onSnapshot(snap=>{ items = snap.docs.map(d=>({id:d.id, ...d.data()})); render(); }, fail);
+  db.collection("shopping").onSnapshot(snap=>{ shop = snap.docs.map(d=>({id:d.id, ...d.data()})); render(); }, fail);
+  db.collection("purchases").orderBy("date","desc").limit(500).onSnapshot(snap=>{ buys = snap.docs.map(d=>({id:d.id, ...d.data()})); render(); }, fail);
+})();
+</script>
+</body>
+</html>
