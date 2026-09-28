@@ -514,7 +514,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
 
 <script type="module">
 // ================== Firebase settings (Station3 Inventory) ==================
-const APP_VERSION = "2026-09-28.10";
+const APP_VERSION = "2026-09-28.11";
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBjLIMIHjhDO4mdIBQ3B568HluSluI2vBI",
   authDomain: "station3-inventory.firebaseapp.com",
@@ -579,17 +579,46 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
   const flagOf = it => qtyOf(it)===0 ? "Out" : "Low";
 
   // Brands: each item can have several brands, each with its own barcode
+  // Barcodes: store UPC-A as 12 digits even if a phone reads it as 13-digit EAN (leading 0) or 14-digit GTIN
+  function normCode(v){
+    let s = String(v||"").replace(/\s+/g,"").slice(0,64);
+    if(/^0\d{12}$/.test(s)) s = s.slice(1);
+    if(/^00\d{12}$/.test(s)) s = s.slice(2);
+    return s;
+  }
+  function gtinCheckDigit(body){
+    let sum = 0;
+    for(let i = body.length-1, w = 3; i >= 0; i--, w = 4-w) sum += Number(body[i]) * w;
+    return (10 - sum % 10) % 10;
+  }
+  const gtinValid = c => /^\d{8}$|^\d{12,14}$/.test(c) && gtinCheckDigit(c.slice(0,-1)) === Number(c.slice(-1));
+  // A scan from the camera: reject UPC/EAN reads whose check digit is wrong (misreads)
+  function goodScan(text, result){
+    const f = (result && result.result && result.result.format && result.result.format.formatName) || "";
+    if(/EAN|UPC/i.test(f)) return gtinValid(String(text).trim());
+    if(/^\d+$/.test(text) && [8,12,13].includes(String(text).length)) return gtinValid(String(text));
+    return true;
+  }
   const brandsOf = it => {
-    const list = Array.isArray(it.brands) ? it.brands.filter(b=>b && (b.name||b.barcode)) : [];
-    if(it.barcode && !list.some(b=>b.barcode===it.barcode)) list.unshift({name:"", barcode:it.barcode});
+    const list = (Array.isArray(it.brands) ? it.brands.filter(b=>b && (b.name||b.barcode)) : []).map(b=>({...b, barcode: normCode(b.barcode)}));
+    const legacy = normCode(it.barcode);
+    if(legacy && !list.some(b=>b.barcode===legacy)) list.unshift({name:"", barcode:legacy});
     return list;
   };
   const brandNames = it => brandsOf(it).map(b=>b.name).filter(Boolean).join(", ");
   const searchText = it => [it.name, it.category, ...brandsOf(it).flatMap(b=>[b.name,b.barcode])].filter(Boolean).join(" ").toLowerCase();
   function findByCode(code){
+    code = normCode(code);
     for(const it of items){
       const b = brandsOf(it).find(b=>b.barcode===code);
       if(b) return {it, brand:b};
+    }
+    // Typed without the small digits on each end of a UPC (10 digits): match the middle
+    if(/^\d{10}$/.test(code)){
+      for(const it of items){
+        const b = brandsOf(it).find(b=>/^\d{12}$/.test(b.barcode) && b.barcode.slice(1,11)===code);
+        if(b) return {it, brand:b};
+      }
     }
     return null;
   }
@@ -802,7 +831,6 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
   }
 
   // ---------- Barcode scanning ----------
-  const normCode = v => String(v||"").replace(/\s+/g,"").slice(0,64);
   let scanner = null, scanMode = "lookup", scanBusy = false, hitId = null, missCode = null;
 
   let fieldRow = null;
@@ -870,7 +898,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
       live = new L.Html5Qrcode("reader",{formatsToSupport:formats, verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
       await live.start({facingMode:"environment"},
         {fps:12, qrbox:(w,h)=>({width:Math.min(300,Math.floor(w*0.85)), height:Math.min(160,Math.floor(h*0.6))})},
-        code=>gotCode(code), ()=>{});
+        (code, res)=>{ if(goodScan(code, res)) gotCode(code); }, ()=>{});
       $("#scanStatus").textContent = "Hold the barcode inside the box.";
     }catch(err){
       await stopLive();
@@ -958,7 +986,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
   $("#scanForm").addEventListener("submit", e=>{ e.preventDefault(); const v=$("#scanManual").value; if(normCode(v)){ scanBusy=false; gotCode(v); } });
   $("#scanCancel").addEventListener("click", ()=>$("#scanDlg").close());
   $("#scanBtn").addEventListener("click", ()=>startScan("lookup"));
-  $("#scanType").addEventListener("click", ()=>{ scanMode="lookup"; $("#scanManual").value=""; $("#reader").hidden = true; $("#scanRetry").textContent = "Take a photo instead"; showScanDlg("Type the barcode number, or use a Bluetooth scanner."); $("#scanManual").focus(); });
+  $("#scanType").addEventListener("click", ()=>{ scanMode="lookup"; $("#scanManual").value=""; $("#reader").hidden = true; $("#scanRetry").textContent = "Take a photo instead"; showScanDlg("Type every digit under the barcode, including the small ones on each end. A Bluetooth scanner works here too."); $("#scanManual").focus(); });
 
   // Add a scanned barcode to an existing item
   let attachTo = null, attachBack = "hit";
@@ -1034,6 +1062,8 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
     return {name: name || brand, brand, size: (p.quantity||"").trim()};
   }
   function lookupProduct(code){
+    code = normCode(code);
+    if(/^\d{10}$/.test(code)) return lookupShortUpc(code);
     if(code in lookupCache) return Promise.resolve(lookupCache[code]);
     if(lookupPending[code]) return lookupPending[code];
     const fields = "product_name,generic_name,brands,quantity";
@@ -1042,7 +1072,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
       try{
         const res = await fetch(`https://${host}/api/v2/product/${encodeURIComponent(code)}.json?fields=${fields}`, {signal:ctl.signal});
         const j = await res.json();
-        return j && j.status===1 && j.product ? cleanTitle(j.product) : null;
+        return j && j.status===1 && j.product ? {...cleanTitle(j.product), code} : null;
       } finally { clearTimeout(t); }
     };
     lookupPending[code] = (async ()=>{
@@ -1057,6 +1087,24 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
       return lookupCache[code];
     })();
     return lookupPending[code];
+  }
+  // 10 digits usually means the small digits on each end of a UPC were left off.
+  // Try each possible first digit (the last is a check digit) and keep the one that's a real product.
+  const shortPending = {};
+  function lookupShortUpc(mid){
+    const key = "short:" + mid;
+    if(key in lookupCache) return Promise.resolve(lookupCache[key]);
+    if(shortPending[mid]) return shortPending[mid];
+    shortPending[mid] = (async ()=>{
+      const cands = [...Array(10)].map((_,d)=>{ const body = d + mid; return body + gtinCheckDigit(body); });
+      const results = await Promise.all(cands.map(c=>lookupProduct(c).catch(()=>null)));
+      const hit = results.find(p=>p && p.name) || null;
+      lookupCache[key] = hit;
+      try{ localStorage.setItem("s3-lookup", JSON.stringify(lookupCache)); }catch(_){}
+      delete shortPending[mid];
+      return hit;
+    })();
+    return shortPending[mid];
   }
   // Best guess at which existing item a looked-up product belongs to
   function guessItem(p){
@@ -1086,7 +1134,11 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
     lookupProduct(code).then(p=>{
       if(missCode!==code || !$("#missDlg").open) return;
       missLookup = p;
-      if(!p){ $("#missFound").textContent = "Not found online. You can still add it by hand."; return; }
+      if(!p){ $("#missFound").innerHTML = `Not found online. <a href="https://www.google.com/search?q=${encodeURIComponent(code)}" target="_blank" rel="noopener">Search Google for ${esc(code)}</a>, then add it by hand.`; return; }
+      if(p.code && p.code !== missCode){
+        missCode = p.code;
+        $("#missCode").textContent = `Barcode ${missCode} isn't in the inventory yet.`;
+      }
       $("#missFound").textContent = `Found online: ${p.name}${p.size?", "+p.size:""}`;
       if(!$("#missBrand").value && p.brand) $("#missBrand").value = p.brand;
       const g = guessItem(p);
@@ -1333,7 +1385,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
       tallyCam = new L.Html5Qrcode("tallyReader",{formatsToSupport:formats, verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
       await tallyCam.start({facingMode:"environment"},
         {fps:15, qrbox:(w,h)=>({width:Math.min(300,Math.floor(w*0.85)), height:Math.min(140,Math.floor(h*0.6))})},
-        onTally, ()=>{});
+        (code, res)=>{ if(goodScan(code, res)) onTally(code); }, ()=>{});
       $("#tallyPause").textContent = "Pause camera";
       if(!$("#tallyLast").textContent) $("#tallyLast").textContent = "Scan each item once.";
     }catch(err){
