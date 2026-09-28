@@ -132,6 +132,8 @@ dialog.wide{width:min(560px,calc(100% - 16px))}
 .trow:first-child{border-top:0}
 .trow .qty output{font-size:22px}
 #tallyList{max-height:38vh;overflow-y:auto;margin-top:8px}
+.rowbtns{display:inline-flex;gap:6px;margin-top:4px}
+.okmsg{color:var(--teal);font-weight:600;font-size:14px;min-height:20px;margin:6px 0 0}
 .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--orange);color:#fff;font-size:12px;line-height:20px;text-align:center}
 .shoprow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
 .shoprow:first-child{border-top:0}
@@ -244,9 +246,9 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
     <label for="iCat">Category <small>optional</small></label>
     <input id="iCat" list="cats" maxlength="40" autocomplete="off" placeholder="Snacks, drinks, supplies…">
     <datalist id="cats"></datalist>
-    <label>Brands and barcodes <small>optional</small></label>
+    <label>Barcodes <small>add as many as you want, brand is optional</small></label>
     <div id="brandList"></div>
-    <button type="button" class="linkbtn" id="addBrand">Add another brand</button>
+    <button type="button" class="linkbtn" id="addBrand">Add another barcode</button>
     <p class="hint" id="barcodeWarn" hidden></p>
     <div class="two">
       <div><label for="iQty">On hand</label><input id="iQty" type="number" min="0" step="1" value="0" inputmode="numeric"></div>
@@ -315,6 +317,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
   <form method="dialog" id="countForm">
     <h2 id="countName">Item</h2>
     <p class="meta" id="countMeta"></p>
+    <p class="okmsg" id="countMsg"></p>
     <label for="countQty">How many are on the shelf?</label>
     <div class="bigcount">
       <button type="button" id="countDec" aria-label="One less">−</button>
@@ -325,6 +328,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
     <input id="countPar" type="number" min="0" step="1" inputmode="numeric" placeholder="How many when fully stocked">
     <div class="actions">
       <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="button" class="btn ghost" id="countCode">Add a barcode</button>
       <button type="button" class="btn ghost" id="countSaveDone">Save</button>
       <button type="submit" class="btn alt">Save and scan next</button>
     </div>
@@ -336,6 +340,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
   <form method="dialog">
     <h2 id="hitName">Item</h2>
     <div class="meta" id="hitMeta"></div>
+    <p class="okmsg" id="hitMsg"></p>
     <div class="hitqty">
       <button type="button" id="hitDec" aria-label="Remove one">−</button>
       <output id="hitQty">0</output>
@@ -343,6 +348,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
     </div>
     <div class="actions">
       <button type="button" class="btn ghost" id="hitEdit">Edit</button>
+      <button type="button" class="btn ghost" id="hitCode">Add a barcode</button>
       <button type="button" class="btn ghost" id="hitList">Add to list</button>
       <button type="button" class="btn alt" id="hitBuy">Restock</button>
     </div>
@@ -358,15 +364,18 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
   <form method="dialog" id="missForm">
     <h2>New barcode</h2>
     <p class="meta" id="missCode"></p>
+    <label for="missItem">Add it to an item you already have</label>
+    <select id="missItem"></select>
     <label for="missBrand">Brand <small>optional</small></label>
     <input id="missBrand" maxlength="40" autocomplete="off" placeholder="Folgers, Great Value…">
-    <div style="margin-top:14px"><button type="button" class="btn" id="missNew" style="width:100%">Add as a new item</button></div>
-    <hr class="divider">
-    <label for="missItem">Or add it as another brand of an item you have</label>
-    <select id="missItem"></select>
     <div class="actions">
+      <button type="submit" class="btn" id="missAttach">Add to this item</button>
+    </div>
+    <hr class="divider">
+    <div class="actions" style="margin-top:8px">
       <button type="button" class="btn ghost" data-close>Cancel</button>
-      <button type="submit" class="btn">Add brand</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn alt" id="missNew">Make it a new item</button>
     </div>
   </form>
 </dialog>
@@ -593,7 +602,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
             <button data-act="inc" data-id="${it.id}" aria-label="Add one ${esc(it.name)}" ${readOnly?"disabled":""}>+</button>
           </div>
           <div class="val"><b>${it.unitCost?money(q*it.unitCost):""}</b>
-            ${readOnly?"":`<button class="btn ghost restock" data-act="buy" data-id="${it.id}">Restock</button>`}</div>
+            ${readOnly?"":`<span class="rowbtns"><button class="btn ghost restock" data-act="edit" data-id="${it.id}">Edit</button><button class="btn ghost restock" data-act="buy" data-id="${it.id}">Restock</button></span>`}</div>
         </div>`;
       });
     });
@@ -703,10 +712,10 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   function addBrandRow(b){
     const row = document.createElement("div");
     row.className = "brandrow";
-    row.innerHTML = `<input class="bName" maxlength="40" autocomplete="off" placeholder="Brand" aria-label="Brand name">
+    row.innerHTML = `<input class="bName" maxlength="40" autocomplete="off" placeholder="Brand (optional)" aria-label="Brand name">
       <input class="bCode" maxlength="64" autocomplete="off" inputmode="numeric" placeholder="Barcode" aria-label="Barcode">
       <button type="button" class="btn ghost bScan">Scan</button>
-      <button type="button" class="del bDel">Remove brand</button>`;
+      <button type="button" class="del bDel">Remove</button>`;
     row.querySelector(".bName").value = b?.name || "";
     row.querySelector(".bCode").value = b?.barcode || "";
     $("#brandList").appendChild(row);
@@ -836,6 +845,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
       const row = (fieldRow && fieldRow.isConnected) ? fieldRow : addBrandRow({});
       row.querySelector(".bCode").value = code; fieldRow = null; checkBarcodeDup(); return;
     }
+    if(scanMode==="attach"){ attachCode(attachTo, code); return; }
     const found = findByCode(code);
     if(scanMode==="count"){ if(found) showCount(found.it); else showMiss(code); return; }
     if(found) showHit(found.it, found.brand); else showMiss(code);
@@ -847,9 +857,34 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   $("#scanBtn").addEventListener("click", ()=>startScan("lookup"));
   $("#scanType").addEventListener("click", ()=>{ scanMode="lookup"; $("#scanManual").value=""; $("#reader").hidden = true; $("#scanRetry").textContent = "Take a photo instead"; showScanDlg("Type the barcode number, or use a Bluetooth scanner."); $("#scanManual").focus(); });
 
+  // Add a scanned barcode to an existing item
+  let attachTo = null, attachBack = "hit";
+  async function attachCode(itemId, code){
+    const it = items.find(i=>i.id===itemId); if(!it) return;
+    const reopen = msg => {
+      if(attachBack==="count"){ showCount(it); $("#countMsg").textContent = msg; }
+      else { showHit(it); $("#hitMsg").textContent = msg; }
+    };
+    const other = findByCode(code);
+    if(other && other.it.id===it.id){ reopen(`That barcode is already on ${it.name}.`); return; }
+    if(other){
+      if(!confirm(`Barcode ${code} is on ${other.it.name}. Move it to ${it.name}?`)){ reopen(""); return; }
+      const rest = brandsOf(other.it).filter(b=>b.barcode!==code);
+      await write(()=>db.doc("items/"+other.it.id).update({brands:rest, barcode:"", updatedAt:Date.now()}));
+    }
+    const ok = await write(()=>db.doc("items/"+it.id).update({brands:[...brandsOf(it), {name:"", barcode:code}], barcode:"", updatedAt:Date.now()}));
+    reopen(ok ? `Added barcode ${code}. Scanning it now brings up ${it.name}.` : "");
+  }
+  function scanToAttach(itemId, back){
+    attachTo = itemId; attachBack = back;
+    if($("#hitDlg").open) $("#hitDlg").close();
+    if($("#countDlg").open) $("#countDlg").close();
+    startScan("attach");
+  }
   let hitBrand = null;
   function showHit(it, brand){
     hitId = it.id; hitBrand = brand && brand.name ? brand.name : null;
+    $("#hitMsg").textContent = "";
     refreshHit();
     $("#hitDlg").showModal();
   }
@@ -867,7 +902,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     $("#hitMeta").textContent = bits.join(", ");
     $("#hitDec").disabled = readOnly || q<=0;
     $("#hitInc").disabled = readOnly;
-    ["#hitEdit","#hitList","#hitBuy"].forEach(s=>$(s).disabled = readOnly);
+    ["#hitEdit","#hitList","#hitBuy","#hitCode"].forEach(s=>$(s).disabled = readOnly);
   }
   const hitItem = () => items.find(i=>i.id===hitId);
   $("#hitInc").addEventListener("click", ()=>{ const it=hitItem(); if(it) bump(it,+1); });
@@ -881,6 +916,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     if(ok) $("#hitList").textContent="On the list";
   });
   $("#hitDlg").addEventListener("close", ()=>{ $("#hitList").textContent="Add to list"; });
+  $("#hitCode").addEventListener("click", ()=>{ if(hitId) scanToAttach(hitId, "hit"); });
   $("#hitAgain").addEventListener("click", ()=>{ $("#hitDlg").close(); startScan("lookup"); });
 
   let missContext = "lookup";
@@ -891,6 +927,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     const sorted = [...items].sort((a,b)=>a.name.localeCompare(b.name));
     $("#missItem").innerHTML = sorted.length ? sorted.map(i=>`<option value="${i.id}">${esc(i.name)}${brandNames(i)?" ("+esc(brandNames(i))+")":""}</option>`).join("") : `<option value="">No items yet</option>`;
     $("#missItem").disabled = !sorted.length || readOnly;
+    $("#missAttach").disabled = !sorted.length || readOnly;
     $("#missNew").disabled = readOnly;
     $("#missDlg").showModal();
   }
@@ -989,6 +1026,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   let countId = null;
   function showCount(it){
     countId = it.id;
+    $("#countMsg").textContent = "";
     if(!countStart) setCountStart(Date.now());
     $("#countName").textContent = it.name;
     const bits = [`App shows ${qtyOf(it)}`];
@@ -1012,6 +1050,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   }
   $("#countForm").addEventListener("submit", async e=>{ e.preventDefault(); await saveCount(); startScan("count"); });
   $("#countSaveDone").addEventListener("click", ()=>saveCount());
+  $("#countCode").addEventListener("click", ()=>{ if(countId) scanToAttach(countId, "count"); });
   $("#countScanBtn").addEventListener("click", ()=>startScan("count"));
 
   // ---------- Scan every item (tally) ----------
