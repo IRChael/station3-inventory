@@ -134,6 +134,23 @@ dialog.wide{width:min(560px,calc(100% - 16px))}
 #tallyList{max-height:38vh;overflow-y:auto;margin-top:8px}
 .rowbtns{display:inline-flex;gap:6px;margin-top:4px}
 .okmsg{color:var(--teal);font-weight:600;font-size:14px;min-height:20px;margin:6px 0 0}
+.submitbar{position:sticky;bottom:0;z-index:5;margin:14px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.submitbar .sum{flex:1;min-width:150px;font-size:14px;color:#b8c4da}
+.submitbar .sum b{color:#fff;font-size:17px;display:block}
+.submitbar .btn.ghost{color:#fff;border-color:#3a5a8c}
+.crow input.draft{border-color:var(--teal);background:var(--surface);font-weight:700}
+.rv{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:15px}
+.rv:first-child{border-top:0}
+.rv .chg{font-weight:700;white-space:nowrap}
+.rv .up{color:var(--teal)} .rv .down{color:var(--orange)}
+#reviewList{max-height:45vh;overflow-y:auto}
+.linkhead{font-family:"Barlow Condensed",sans-serif;font-size:22px;margin:4px 0 6px}
+#linkWrap{margin-bottom:16px}
+.prow{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+.prow:first-child{border-top:0}
+.prow .paid{grid-column:1 / -1;display:flex;align-items:center;gap:8px;margin:0;font-size:14px;font-weight:500;color:var(--muted)}
+.prow .paid input{width:110px;padding:7px 8px}
+#putList{max-height:45vh;overflow-y:auto}
 .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--orange);color:#fff;font-size:12px;line-height:20px;text-align:center}
 .shoprow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
 .shoprow:first-child{border-top:0}
@@ -169,7 +186,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
   <div class="wrap">
     <div class="brand">
       <h1>Station 3 Clique <span>Inventory</span></h1>
-      <div class="sync"><span id="sync">Connecting…</span></div>
+      <div class="sync"><span id="sync">Connecting…</span> <span id="ver" style="opacity:.6"></span></div>
     </div>
     <div class="stats">
       <div class="stat"><b id="sValue">$0.00</b><small>Stock on hand</small></div>
@@ -195,29 +212,40 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
         <option value="all">All items</option>
         <option value="low">Running low</option>
       </select>
+      <button class="btn alt" id="putBtn">Put away</button>
       <button class="btn alt" id="scanBtn">Scan</button>
       <button class="btn ghost" id="scanType" aria-label="Type a barcode">Type code</button>
       <button class="btn" id="addBtn">Add item</button>
     </div>
     <div class="list" id="stockList"></div>
+    <p style="margin:10px 0 0"><button class="linkbtn" id="mergeHistBtn" hidden>Merge history</button></p>
   </section>
 
   <section id="tab-count" hidden>
+    <p class="hint" style="margin:0 0 12px">Count everything, then submit once. Nothing on the Stock tab changes until you submit. If something is on more than one shelf, just keep counting it and it adds up.</p>
     <div class="countbar">
       <button class="btn alt" id="tallyBtn">Scan every item</button>
       <button class="btn ghost" id="countScanBtn">Scan and type count</button>
-      <span class="progress" id="countProgress"></span>
-      <button class="linkbtn" id="countReset">Start a new count</button>
     </div>
     <div class="toolbar">
       <input id="countSearch" type="search" placeholder="Search items" aria-label="Search items to count">
       <select id="countFilter" aria-label="Filter">
         <option value="all">All items</option>
         <option value="todo">Not counted yet</option>
+        <option value="done">Counted</option>
       </select>
     </div>
+    <div id="linkWrap" hidden>
+      <h3 class="linkhead">Barcodes to link <span class="badge" id="linkCount"></span></h3>
+      <p class="hint" style="margin:0 0 8px">You scanned these but they aren't tied to an item yet. Link each one so it counts.</p>
+      <div class="list" id="linkList"></div>
+    </div>
     <div class="list" id="countList"></div>
-    <p class="hint">Type what's on the shelf and it saves as soon as you move to the next box. Par is how many you want on hand when fully stocked.</p>
+    <div class="submitbar" id="submitBar">
+      <div class="sum"><b id="countProgress">Nothing counted yet</b><span id="countSub">Counts stay on this phone until you submit</span></div>
+      <button class="btn ghost" id="countReset">Discard</button>
+      <button class="btn alt" id="submitBtn">Submit inventory</button>
+    </div>
   </section>
 
   <section id="tab-shop" hidden>
@@ -263,6 +291,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
     <p class="hint" id="marginHint"></p>
     <div class="actions">
       <button type="button" class="btn danger" id="iDelete" hidden>Delete</button>
+      <button type="button" class="btn ghost" id="iMerge" hidden>Merge</button>
       <span class="spacer"></span>
       <button type="button" class="btn ghost" data-close>Cancel</button>
       <button type="submit" class="btn" id="iSave">Save item</button>
@@ -294,7 +323,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
 <!-- Tally dialog (scan every item) -->
 <dialog id="tallyDlg" class="wide">
   <form method="dialog" id="tallyForm">
-    <h2>Scan every item</h2>
+    <h2 id="tallyTitle">Scan every item</h2>
     <div id="tallyReader"></div>
     <p class="tallylast" id="tallyLast" aria-live="polite"></p>
     <div class="actions" style="justify-content:flex-start;margin-top:0">
@@ -302,23 +331,19 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
       <button type="button" class="btn ghost" id="tallyUndo" disabled>Undo last</button>
     </div>
     <div class="list" id="tallyList"></div>
-    <label class="chk"><input type="checkbox" id="tallyZero"> Set anything I didn't scan to 0</label>
     <div class="actions">
-      <button type="button" class="btn danger" id="tallyDiscard">Discard</button>
-      <span class="spacer"></span>
-      <button type="button" class="btn ghost" id="tallyLater">Finish later</button>
-      <button type="submit" class="btn alt">Save counts</button>
+      <button type="submit" class="btn alt" id="tallyDone">Done scanning</button>
     </div>
   </form>
 </dialog>
 
-<!-- Count dialog (scan to count) -->
+<!-- Count dialog (scan and type count) -->
 <dialog id="countDlg">
   <form method="dialog" id="countForm">
     <h2 id="countName">Item</h2>
     <p class="meta" id="countMeta"></p>
     <p class="okmsg" id="countMsg"></p>
-    <label for="countQty">How many are on the shelf?</label>
+    <label for="countQty">How many here? <small>adds to what you've counted</small></label>
     <div class="bigcount">
       <button type="button" id="countDec" aria-label="One less">−</button>
       <input id="countQty" type="number" min="0" step="1" inputmode="numeric">
@@ -329,8 +354,71 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
     <div class="actions">
       <button type="button" class="btn ghost" data-close>Cancel</button>
       <button type="button" class="btn ghost" id="countCode">Add a barcode</button>
-      <button type="button" class="btn ghost" id="countSaveDone">Save</button>
-      <button type="submit" class="btn alt">Save and scan next</button>
+      <button type="button" class="btn ghost" id="countSaveDone">Add</button>
+      <button type="submit" class="btn alt">Add and scan next</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Merge -->
+<dialog id="mergeDlg">
+  <form method="dialog" id="mergeForm">
+    <h2>Merge items</h2>
+    <p class="meta" id="mergeIntro"></p>
+    <label for="mergeInto">Merge it into</label>
+    <select id="mergeInto"></select>
+    <div class="list" id="mergePreview" style="margin-top:12px"></div>
+    <div class="actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn alt" id="mergeGo">Merge</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Merge history -->
+<dialog id="mergeHistDlg" class="wide">
+  <form method="dialog">
+    <h2>Merge history</h2>
+    <p class="meta">Undo splits the item back out with its own barcodes, count, and purchases.</p>
+    <div class="list" id="mergeHistList" style="margin-top:10px"></div>
+    <div class="actions"><button type="button" class="btn" data-close>Done</button></div>
+  </form>
+</dialog>
+
+<!-- Put away review -->
+<dialog id="putDlg" class="wide">
+  <form method="dialog" id="putForm">
+    <h2>Put away</h2>
+    <p class="meta" id="putSummary"></p>
+    <div class="list" id="putList"></div>
+    <div id="putLinkWrap" hidden style="margin-top:12px">
+      <p class="hint" id="putUnknown"></p>
+      <div class="list" id="putLinkList"></div>
+    </div>
+    <p class="hint">Paid each is optional. Fill it in to update the cost and log the purchase.</p>
+    <div class="actions">
+      <button type="button" class="btn danger" id="putDiscard">Discard</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" id="putMore">Scan more</button>
+      <button type="submit" class="btn alt" id="putGo">Add to stock</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Submit review -->
+<dialog id="reviewDlg" class="wide">
+  <form method="dialog" id="reviewForm">
+    <h2>Submit inventory</h2>
+    <p class="meta" id="reviewSummary"></p>
+    <div class="list" id="reviewList"></div>
+    <div id="reviewLinkWrap" hidden>
+      <p class="hint" id="reviewUnknown"></p>
+      <div class="list" id="reviewLinkList"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="reviewZero"> <span id="reviewZeroText">Set items I didn't count to 0</span></label>
+    <div class="actions">
+      <button type="button" class="btn ghost" data-close>Keep counting</button>
+      <button type="submit" class="btn alt" id="reviewGo">Submit</button>
     </div>
   </form>
 </dialog>
@@ -364,6 +452,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
   <form method="dialog" id="missForm">
     <h2>New barcode</h2>
     <p class="meta" id="missCode"></p>
+    <p class="okmsg" id="missFound"></p>
     <label for="missItem">Add it to an item you already have</label>
     <select id="missItem"></select>
     <label for="missBrand">Brand <small>optional</small></label>
@@ -425,6 +514,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
 
 <script type="module">
 // ================== Firebase settings (Station3 Inventory) ==================
+const APP_VERSION = "2026-09-28.10";
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBjLIMIHjhDO4mdIBQ3B568HluSluI2vBI",
   authDomain: "station3-inventory.firebaseapp.com",
@@ -436,7 +526,7 @@ const FIREBASE_CONFIG = {
 // ===================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 (function(){
   const $ = s => document.querySelector(s);
@@ -445,7 +535,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   const num = (v,d=0) => { const n = parseFloat(v); return isFinite(n) ? n : d; };
   const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
 
-  let db = null, items = [], buys = [], shop = [], editing = null, readOnly = false, shopTarget = null, newQtyPrefill = null;
+  let db = null, items = [], buys = [], shop = [], merges = [], editing = null, readOnly = false, shopTarget = null, newQtyPrefill = null;
   const pending = new Map(); // itemId -> {qty, timer}
 
   // ---------- Tabs ----------
@@ -529,6 +619,12 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     $("#shopCount").textContent = n; $("#shopCount").hidden = n===0;
     renderStock(); renderCount(); renderShop(); renderLog();
     if($("#tallyDlg").open) renderTally();
+    if($("#reviewDlg").open) renderReview();
+    if($("#putDlg").open) renderPut();
+    $("#mergeHistBtn").hidden = !merges.length;
+    if($("#mergeHistDlg").open) renderMergeHist();
+    { const n = Object.values(putDraft.codes).reduce((a,b)=>a+b,0) + Object.values(putDraft.manual).reduce((a,b)=>a+b,0);
+      $("#putBtn").textContent = n>0 ? `Put away (${n})` : "Put away"; $("#putBtn").disabled = !db || readOnly; }
     if($("#hitDlg").open) refreshHit();
   }
 
@@ -698,6 +794,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     (bl.length ? bl : [{name:"",barcode:""}]).forEach(b=>addBrandRow(b));
     checkBarcodeDup();
     $("#iDelete").hidden = !it;
+    $("#iMerge").hidden = !it || items.length < 2;
     $("#iSave").textContent = it ? "Save changes" : "Add item";
     updateMargin();
     $("#itemDlg").showModal();
@@ -843,7 +940,13 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     if($("#scanDlg").open) $("#scanDlg").close();
     if(scanMode==="field"){
       const row = (fieldRow && fieldRow.isConnected) ? fieldRow : addBrandRow({});
-      row.querySelector(".bCode").value = code; fieldRow = null; checkBarcodeDup(); return;
+      row.querySelector(".bCode").value = code; fieldRow = null; checkBarcodeDup();
+      lookupProduct(code).then(p=>{
+        if(!p || !$("#itemDlg").open) return;
+        if(!$("#iName").value.trim()) $("#iName").value = p.name;
+        const bn = row.querySelector(".bName"); if(!bn.value.trim() && p.brand) bn.value = p.brand;
+      });
+      return;
     }
     if(scanMode==="attach"){ attachCode(attachTo, code); return; }
     const found = findByCode(code);
@@ -920,9 +1023,59 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   $("#hitAgain").addEventListener("click", ()=>{ $("#hitDlg").close(); startScan("lookup"); });
 
   let missContext = "lookup";
+  // ---------- Online product lookup (Open Food Facts, free, no account) ----------
+  const lookupCache = {};
+  try{ Object.assign(lookupCache, JSON.parse(localStorage.getItem("s3-lookup")||"{}")); }catch(_){}
+  const lookupPending = {};
+  function cleanTitle(p){
+    const brand = (p.brands||"").split(",")[0].trim();
+    let name = (p.product_name || p.generic_name || "").trim();
+    if(brand && name && !name.toLowerCase().includes(brand.toLowerCase())) name = `${brand} ${name}`;
+    return {name: name || brand, brand, size: (p.quantity||"").trim()};
+  }
+  function lookupProduct(code){
+    if(code in lookupCache) return Promise.resolve(lookupCache[code]);
+    if(lookupPending[code]) return lookupPending[code];
+    const fields = "product_name,generic_name,brands,quantity";
+    const tryHost = async host => {
+      const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 6000);
+      try{
+        const res = await fetch(`https://${host}/api/v2/product/${encodeURIComponent(code)}.json?fields=${fields}`, {signal:ctl.signal});
+        const j = await res.json();
+        return j && j.status===1 && j.product ? cleanTitle(j.product) : null;
+      } finally { clearTimeout(t); }
+    };
+    lookupPending[code] = (async ()=>{
+      let found = null;
+      for(const host of ["world.openfoodfacts.org","world.openproductsfacts.org"]){
+        try{ found = await tryHost(host); }catch(_){ delete lookupPending[code]; return null; } // offline: don't cache
+        if(found && found.name) break;
+      }
+      lookupCache[code] = found && found.name ? found : null;
+      try{ localStorage.setItem("s3-lookup", JSON.stringify(lookupCache)); }catch(_){}
+      delete lookupPending[code];
+      return lookupCache[code];
+    })();
+    return lookupPending[code];
+  }
+  // Best guess at which existing item a looked-up product belongs to
+  function guessItem(p){
+    if(!p) return null;
+    const words = w => (w||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>2);
+    const target = new Set([...words(p.name), ...words(p.brand)]);
+    let best = null, bestScore = 0;
+    items.forEach(it=>{
+      const score = [...words(it.name), ...brandsOf(it).flatMap(b=>words(b.name))].filter(w=>target.has(w)).length;
+      if(score > bestScore){ best = it; bestScore = score; }
+    });
+    return best;
+  }
+
+  let missLookup = null;
   function showMiss(code, context){
-    missCode = code; missContext = context || scanMode;
+    missCode = code; missContext = context || scanMode; missLookup = null;
     $("#missCode").textContent = `Barcode ${code} isn't in the inventory yet.`;
+    $("#missFound").textContent = "Looking it up online…";
     $("#missBrand").value = "";
     const sorted = [...items].sort((a,b)=>a.name.localeCompare(b.name));
     $("#missItem").innerHTML = sorted.length ? sorted.map(i=>`<option value="${i.id}">${esc(i.name)}${brandNames(i)?" ("+esc(brandNames(i))+")":""}</option>`).join("") : `<option value="">No items yet</option>`;
@@ -930,13 +1083,22 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     $("#missAttach").disabled = !sorted.length || readOnly;
     $("#missNew").disabled = readOnly;
     $("#missDlg").showModal();
+    lookupProduct(code).then(p=>{
+      if(missCode!==code || !$("#missDlg").open) return;
+      missLookup = p;
+      if(!p){ $("#missFound").textContent = "Not found online. You can still add it by hand."; return; }
+      $("#missFound").textContent = `Found online: ${p.name}${p.size?", "+p.size:""}`;
+      if(!$("#missBrand").value && p.brand) $("#missBrand").value = p.brand;
+      const g = guessItem(p);
+      if(g) $("#missItem").value = g.id;
+    });
   }
   $("#missNew").addEventListener("click", ()=>{
     const brand = $("#missBrand").value.trim();
     $("#missDlg").close(); shopTarget=null; openItem(null);
+    if(missLookup && missLookup.name) $("#iName").value = missLookup.name;
     const row = $("#brandList .brandrow");
     row.querySelector(".bName").value = brand; row.querySelector(".bCode").value = missCode;
-    if(missContext==="tally") $("#iQty").value = tallyCountForCode(missCode);
     checkBarcodeDup();
   });
   $("#missForm").addEventListener("submit", async e=>{
@@ -949,46 +1111,79 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     const ok = await write(()=>db.doc("items/"+id).update({brands, barcode:"", updatedAt:Date.now()}));
     if(!ok) return;
     if(missContext==="tally") renderTally();
+    else if(missContext==="link") { render(); flashBanner(`Linked to ${it.name}. Its scans now count.`); }
     else if(missContext==="count") showCount(it);
     else showHit(it, brand);
   });
 
-  // ---------- Take inventory ----------
-  let countStart = 0;
-  try{ countStart = Number(localStorage.getItem("s3-countStart")) || 0; }catch(_){}
-  function setCountStart(t){ countStart = t; try{ localStorage.setItem("s3-countStart", String(t)); }catch(_){} }
-  const countedNow = it => countStart && (it.countedAt||0) >= countStart;
-  let countDirty = false;
+  // ---------- Take inventory: one draft count, submitted all at once ----------
+  // draft.codes: scans per barcode, draft.manual: typed/adjusted amounts per item,
+  // draft.par: par changes per item. Kept on this phone until Submit.
+  const emptyDraft = () => ({codes:{}, manual:{}, par:{}, undo:[]});
+  let tally = emptyDraft();
+  try{ const t = JSON.parse(localStorage.getItem("s3-tally")||"null"); if(t && t.codes) tally = Object.assign(emptyDraft(), t); }catch(_){}
+  const saveTally = () => { try{ localStorage.setItem("s3-tally", JSON.stringify(tally)); }catch(_){} };
+  // Put-away draft (scanning groceries onto the shelf), separate from the inventory count
+  let putDraft = emptyDraft();
+  try{ const t = JSON.parse(localStorage.getItem("s3-put")||"null"); if(t && t.codes) putDraft = Object.assign(emptyDraft(), t); }catch(_){}
+  const savePut = () => { try{ localStorage.setItem("s3-put", JSON.stringify(putDraft)); }catch(_){} };
+  let tallyMode = "count";
+  const cur = () => tallyMode==="put" ? putDraft : tally;
+  const saveCur = () => tallyMode==="put" ? savePut() : saveTally();
+  const draftOf = name => name==="put" ? putDraft : tally;
+  const saveDraft = name => name==="put" ? savePut() : saveTally();
+  const tallyScans = () => Object.values(tally.codes).reduce((a,b)=>a+b,0);
+  const tallyCountForCode = code => tally.codes[code]||0;
+  function tallyFor(it, d){
+    d = d || tally;
+    let n = 0; const by = [];
+    brandsOf(it).forEach(b=>{ const c = d.codes[b.barcode]||0; if(c){ n+=c; if(b.name) by.push(`${b.name} ${c}`); } });
+    n += d.manual[it.id]||0;
+    return {n: Math.max(0,n), by, touched: n!==0 || (it.id in d.manual)};
+  }
+  function setDraftTotal(it, total){
+    const scanned = tallyFor(it).n - (tally.manual[it.id]||0);
+    tally.manual[it.id] = total - scanned;
+  }
+  const countedItems = () => items.filter(it=>tallyFor(it).touched);
+  function draftIsEmpty(){
+    return !Object.keys(tally.codes).length && !Object.keys(tally.manual).length && !Object.keys(tally.par).length;
+  }
 
+  let countDirty = false;
   function renderCount(force){
-    if($("#tab-count").hidden && !force) return;
-    const el = $("#countList");
-    // Don't redraw while someone is typing a count
-    if(!force && el.contains(document.activeElement)){ countDirty = true; return; }
-    countDirty = false;
-    const done = items.filter(countedNow).length;
-    $("#countProgress").innerHTML = countStart
-      ? `<b>${done} of ${items.length}</b> counted this round`
-      : `Scan or type counts below`;
+    const done = countedItems().length;
+    const parChanges = Object.keys(tally.par).length;
+    $("#countProgress").textContent = done ? `${done} of ${items.length} items counted` : (parChanges ? "Par changes only" : "Nothing counted yet");
+    $("#countSub").textContent = done || parChanges ? "Not submitted yet" : "Counts stay on this phone until you submit";
+    $("#submitBtn").disabled = !db || readOnly || draftIsEmpty();
+    $("#countReset").disabled = draftIsEmpty();
     $("#countScanBtn").disabled = !db || readOnly;
     $("#tallyBtn").disabled = !db || readOnly;
     const n = tallyScans();
-    $("#tallyBtn").textContent = n ? `Keep scanning (${n} so far)` : "Scan every item";
+    $("#tallyBtn").textContent = n ? `Keep scanning (${n} scanned)` : "Scan every item";
+    renderLinks();
+    if($("#tab-count").hidden && !force) return;
+    const el = $("#countList");
+    if(!force && el.contains(document.activeElement)){ countDirty = true; return; }
+    countDirty = false;
     if(!db){ el.innerHTML = `<div class="empty"><p>Loading…</p></div>`; return; }
-    if(items.length===0){ el.innerHTML = `<div class="empty"><p>No items yet. Tap Scan to count and add things as you scan them.</p></div>`; return; }
+    if(items.length===0){ el.innerHTML = `<div class="empty"><p>No items yet. Tap Scan every item and add things as you scan them.</p></div>`; return; }
     const q = $("#countSearch").value.trim().toLowerCase();
     const f = $("#countFilter").value;
-    const list = items.filter(it => (!q || searchText(it).includes(q)) && (f!=="todo" || !countedNow(it)))
+    const list = items.filter(it => (!q || searchText(it).includes(q)) && (f==="all" || (f==="todo") !== tallyFor(it).touched))
       .sort((a,b)=> (a.category||"~").localeCompare(b.category||"~") || a.name.localeCompare(b.name));
-    if(list.length===0){ el.innerHTML = `<div class="empty"><p>${f==="todo"?"Everything's been counted.":"Nothing matches."}</p></div>`; return; }
-    el.innerHTML = `<div class="crow head"><span>Item</span><span style="text-align:center">On shelf</span><span style="text-align:center">Par</span></div>` +
+    if(list.length===0){ el.innerHTML = `<div class="empty"><p>${f==="todo"?"Everything's been counted.":f==="done"?"Nothing counted yet.":"Nothing matches."}</p></div>`; return; }
+    el.innerHTML = `<div class="crow head"><span>Item</span><span style="text-align:center">Counted</span><span style="text-align:center">Par</span></div>` +
       list.map(it=>{
-        const last = it.countedAt ? new Date(it.countedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : "never";
-        return `<div class="crow${countedNow(it)?" done":""}">
-          <div><b>${esc(it.name)}</b>${countedNow(it)?'<span class="check" aria-label="Counted">✓</span>':""}
-            <div class="meta">Last counted ${esc(last)}</div></div>
-          <input type="number" min="0" step="1" inputmode="numeric" data-count="${it.id}" value="${qtyOf(it)}" aria-label="${esc(it.name)} on shelf" ${readOnly?"disabled":""}>
-          <input type="number" min="0" step="1" inputmode="numeric" data-par="${it.id}" value="${it.par||""}" placeholder="–" aria-label="${esc(it.name)} par" ${readOnly?"disabled":""}>
+        const t = tallyFor(it);
+        const par = it.id in tally.par ? tally.par[it.id] : (it.par||"");
+        const meta = [`App has ${qtyOf(it)}`]; if(t.by.length) meta.push(t.by.join(", "));
+        return `<div class="crow${t.touched?" done":""}">
+          <div><b>${esc(it.name)}</b>${t.touched?'<span class="check" aria-label="Counted">✓</span>':""}
+            <div class="meta">${esc(meta.join(", "))}</div></div>
+          <input type="number" min="0" step="1" inputmode="numeric" data-count="${it.id}" value="${t.touched?t.n:""}" placeholder="–" class="${t.touched?"draft":""}" aria-label="${esc(it.name)} counted" ${readOnly?"disabled":""}>
+          <input type="number" min="0" step="1" inputmode="numeric" data-par="${it.id}" value="${par}" placeholder="–" class="${it.id in tally.par?"draft":""}" aria-label="${esc(it.name)} par" ${readOnly?"disabled":""}>
         </div>`;
       }).join("");
   }
@@ -996,76 +1191,69 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   $("#countSearch").addEventListener("input", ()=>renderCount(true));
   $("#countFilter").addEventListener("change", ()=>renderCount(true));
   $("#countReset").addEventListener("click", ()=>{
-    if(countStart && !confirm("Start a new count? Checkmarks reset, counts stay.")) return;
-    setCountStart(Date.now()); renderCount(true);
+    if(!confirm("Throw away this whole count? Nothing on the Stock tab changes.")) return;
+    tally = emptyDraft(); saveTally(); renderCount(true);
   });
-  $("#countList").addEventListener("change", async e=>{
+  $("#countList").addEventListener("change", e=>{
     const t = e.target;
+    const id = t.dataset.count || t.dataset.par; if(!id) return;
+    const it = items.find(i=>i.id===id); if(!it) return;
+    const raw = t.value.trim();
     if(t.dataset.count){
-      const it = items.find(i=>i.id===t.dataset.count); if(!it) return;
-      if(!countStart) setCountStart(Date.now());
-      const v = Math.max(0, Math.round(num(t.value, qtyOf(it))));
-      pending.delete(it.id);
-      await write(()=>db.doc("items/"+it.id).update({qty:v, countedAt:Date.now(), updatedAt:Date.now()}));
-    } else if(t.dataset.par){
-      const it = items.find(i=>i.id===t.dataset.par); if(!it) return;
-      const v = Math.max(0, Math.round(num(t.value, 0)));
-      await write(()=>db.doc("items/"+it.id).update({par:v, updatedAt:Date.now()}));
+      if(raw===""){ delete tally.manual[it.id]; Object.keys(tally.codes).forEach(c=>{ if(brandsOf(it).some(b=>b.barcode===c)) delete tally.codes[c]; }); }
+      else setDraftTotal(it, Math.max(0, Math.round(num(raw))));
+    } else {
+      const v = raw==="" ? 0 : Math.max(0, Math.round(num(raw)));
+      if(v === (it.par||0)) delete tally.par[it.id]; else tally.par[it.id] = v;
     }
+    saveTally(); renderCount();
   });
   $("#countList").addEventListener("keydown", e=>{
     if(e.key!=="Enter" || e.target.tagName!=="INPUT") return;
     e.preventDefault();
     const inputs = [...$("#countList").querySelectorAll("input[data-count]")];
     const i = inputs.indexOf(e.target);
-    if(i>=0 && inputs[i+1]){ inputs[i+1].focus(); inputs[i+1].select(); } else e.target.blur();
+    if(i>=0 && inputs[i+1]){ inputs[i+1].focus(); } else e.target.blur();
   });
   $("#countList").addEventListener("focusout", ()=>{ setTimeout(()=>{ if(countDirty && !$("#countList").contains(document.activeElement)) renderCount(); },0); });
   $("#countList").addEventListener("focusin", e=>{ if(e.target.tagName==="INPUT") e.target.select(); });
 
+  // Scan and type count: adds to the draft for that item
   let countId = null;
   function showCount(it){
     countId = it.id;
     $("#countMsg").textContent = "";
-    if(!countStart) setCountStart(Date.now());
     $("#countName").textContent = it.name;
-    const bits = [`App shows ${qtyOf(it)}`];
-    if(it.countedAt) bits.push(`last counted ${new Date(it.countedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"})}`);
-    $("#countMeta").textContent = bits.join(", ");
-    $("#countQty").value = qtyOf(it);
-    $("#countPar").value = it.par || "";
+    const t = tallyFor(it);
+    $("#countMeta").textContent = `Counted so far: ${t.n}. App has ${qtyOf(it)}.`;
+    $("#countQty").value = "";
+    $("#countPar").value = it.id in tally.par ? tally.par[it.id] : (it.par || "");
     $("#countDlg").showModal();
-    $("#countQty").focus(); $("#countQty").select();
+    $("#countQty").focus();
   }
   $("#countInc").addEventListener("click", ()=>{ $("#countQty").value = Math.max(0, Math.round(num($("#countQty").value))+1); });
   $("#countDec").addEventListener("click", ()=>{ $("#countQty").value = Math.max(0, Math.round(num($("#countQty").value))-1); });
-  async function saveCount(){
+  function saveCount(){
     const it = items.find(i=>i.id===countId); if(!it) return false;
-    const body = { qty: Math.max(0, Math.round(num($("#countQty").value, qtyOf(it)))), countedAt: Date.now(), updatedAt: Date.now() };
+    const add = Math.max(0, Math.round(num($("#countQty").value, 0)));
+    tally.manual[it.id] = (tally.manual[it.id]||0) + add;
     const par = $("#countPar").value.trim();
-    body.par = par==="" ? 0 : Math.max(0, Math.round(num(par)));
-    pending.delete(it.id);
+    const pv = par==="" ? 0 : Math.max(0, Math.round(num(par)));
+    if(pv !== (it.par||0)) tally.par[it.id] = pv; else delete tally.par[it.id];
+    saveTally();
     $("#countDlg").close();
-    return write(()=>db.doc("items/"+it.id).update(body));
+    flashBanner(`${it.name}: ${tallyFor(it).n} counted`);
+    renderCount(true);
+    return true;
   }
-  $("#countForm").addEventListener("submit", async e=>{ e.preventDefault(); await saveCount(); startScan("count"); });
+  function flashBanner(msg){ banner(msg); clearTimeout(flashBanner.t); flashBanner.t = setTimeout(()=>banner(""), 2500); }
+  $("#countForm").addEventListener("submit", e=>{ e.preventDefault(); if(saveCount()) startScan("count"); });
   $("#countSaveDone").addEventListener("click", ()=>saveCount());
   $("#countCode").addEventListener("click", ()=>{ if(countId) scanToAttach(countId, "count"); });
   $("#countScanBtn").addEventListener("click", ()=>startScan("count"));
 
-  // ---------- Scan every item (tally) ----------
-  let tally = {codes:{}, manual:{}, undo:[]};
-  try{ const t = JSON.parse(localStorage.getItem("s3-tally")||"null"); if(t && t.codes) tally = {codes:t.codes, manual:t.manual||{}, undo:t.undo||[]}; }catch(_){}
-  const saveTally = () => { try{ localStorage.setItem("s3-tally", JSON.stringify(tally)); }catch(_){} };
-  const tallyScans = () => Object.values(tally.codes).reduce((a,b)=>a+b,0);
-  const tallyCountForCode = code => tally.codes[code]||0;
-  function tallyFor(it){
-    let n = 0; const by = [];
-    brandsOf(it).forEach(b=>{ const c = tally.codes[b.barcode]||0; if(c){ n+=c; if(b.name) by.push(`${b.name} ${c}`); } });
-    n += tally.manual[it.id]||0;
-    return {n: Math.max(0,n), by, touched: n!==0 || it.id in tally.manual};
-  }
-  let tallyCam = null, tallyPaused = false, lastCode = "", lastSeen = 0, audio = null;
+  // ---------- Scan every item ----------
+  let tallyCam = null, lastCode = "", lastSeen = 0, audio = null;
   function beep(ok){
     try{
       audio = audio || new (window.AudioContext||window.webkitAudioContext)();
@@ -1083,53 +1271,58 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     const now = Date.now();
     if(code===lastCode && now-lastSeen < 1200){ lastSeen = now; return; } // same barcode still in view
     lastCode = code; lastSeen = now;
-    tally.codes[code] = (tally.codes[code]||0) + 1;
-    tally.undo.push(code); if(tally.undo.length>200) tally.undo.shift();
-    saveTally();
+    const d = cur();
+    d.codes[code] = (d.codes[code]||0) + 1;
+    d.undo.push(code); if(d.undo.length>300) d.undo.shift();
+    saveCur();
     if(navigator.vibrate) try{ navigator.vibrate(40); }catch(_){}
     const found = findByCode(code);
     if(found){
       beep(true);
-      const t = tallyFor(found.it);
-      flash("hit", `+1 ${found.it.name}${found.brand.name?" ("+found.brand.name+")":""}: ${t.n}`);
+      flash("hit", `+1 ${found.it.name}${found.brand.name?" ("+found.brand.name+")":""}: ${tallyFor(found.it, d).n}${tallyMode==="put"?" going in":""}`);
     } else {
       beep(false);
-      flash("miss", `Unknown barcode. Add it from the list below.`);
+      flash("miss", lookupCache[code] ? `Not linked yet: ${lookupCache[code].name}. Keep scanning, link it later.` : `Unknown barcode. Keep scanning, link it later.`);
+      if(!(code in lookupCache)) lookupProduct(code).then(p=>{ if(p && lastCode===code && $("#tallyDlg").open) $("#tallyLast").textContent = `Not linked yet: ${p.name}. Keep scanning, link it later.`; });
     }
-    renderTally();
+    renderTally(); renderCount();
   }
   function renderTally(){
-    $("#tallyUndo").disabled = !tally.undo.length;
-    const known = new Set();
-    const rows = [];
+    const d = cur();
+    $("#tallyTitle").textContent = tallyMode==="put" ? "Put away" : "Scan every item";
+    $("#tallyDone").textContent = tallyMode==="put" ? "Done, review and add" : "Done scanning";
+    $("#tallyUndo").disabled = !d.undo.length;
+    const known = new Set(); const rows = [];
     items.forEach(it=>{
       brandsOf(it).forEach(b=>b.barcode && known.add(b.barcode));
-      const t = tallyFor(it);
+      const t = tallyFor(it, d);
       if(t.touched) rows.push({it, t});
     });
     rows.sort((a,b)=>a.it.name.localeCompare(b.it.name));
-    const unknown = Object.entries(tally.codes).filter(([c,n])=>n>0 && !known.has(c));
+    const unknown = Object.entries(d.codes).filter(([c,n])=>n>0 && !known.has(c));
     let html = rows.map(({it,t})=>`<div class="trow">
-        <div><b>${esc(it.name)}</b><div class="meta">${t.by.length?esc(t.by.join(", "))+", ":""}app had ${qtyOf(it)}</div></div>
+        <div><b>${esc(it.name)}</b><div class="meta">${t.by.length?esc(t.by.join(", "))+", ":""}${tallyMode==="put"?`has ${qtyOf(it)}, will be ${qtyOf(it)+t.n}`:`app has ${qtyOf(it)}`}</div></div>
         <div class="qty">
           <button type="button" data-tdec="${it.id}" aria-label="One less ${esc(it.name)}" ${t.n<=0?"disabled":""}>−</button>
           <output>${t.n}</output>
           <button type="button" data-tinc="${it.id}" aria-label="One more ${esc(it.name)}">+</button>
         </div></div>`).join("");
     html += unknown.map(([c,n])=>`<div class="trow">
-        <div><b>Unknown barcode</b><div class="meta">${esc(c)}, scanned ${n}</div></div>
-        <div class="shopbtns"><button type="button" class="btn restock" data-tadd="${esc(c)}">Add</button>
+        <div><b>${lookupCache[c] ? esc(lookupCache[c].name) : "Unknown barcode"}</b><div class="meta">Not in the app yet, ${esc(c)}, scanned ${n}</div></div>
+        <div class="shopbtns"><button type="button" class="btn restock" data-tadd="${esc(c)}">Link</button>
         <button type="button" class="del" data-tdrop="${esc(c)}">Ignore</button></div></div>`).join("");
     $("#tallyList").innerHTML = html || `<div class="empty"><p>Nothing scanned yet.</p></div>`;
+    unknown.forEach(([c])=>{ if(!(c in lookupCache) && !lookupPending[c]) lookupProduct(c).then(p=>{ if(p && $("#tallyDlg").open) renderTally(); }); });
   }
   $("#tallyList").addEventListener("click", e=>{
     const b = e.target.closest("button"); if(!b) return;
-    if(b.dataset.tinc){ tally.manual[b.dataset.tinc] = (tally.manual[b.dataset.tinc]||0)+1; }
-    else if(b.dataset.tdec){ tally.manual[b.dataset.tdec] = (tally.manual[b.dataset.tdec]||0)-1; }
+    const d = cur();
+    if(b.dataset.tinc){ d.manual[b.dataset.tinc] = (d.manual[b.dataset.tinc]||0)+1; }
+    else if(b.dataset.tdec){ d.manual[b.dataset.tdec] = (d.manual[b.dataset.tdec]||0)-1; }
     else if(b.dataset.tadd){ showMiss(b.dataset.tadd, "tally"); return; }
-    else if(b.dataset.tdrop){ delete tally.codes[b.dataset.tdrop]; tally.undo = tally.undo.filter(c=>c!==b.dataset.tdrop); }
+    else if(b.dataset.tdrop){ delete d.codes[b.dataset.tdrop]; d.undo = d.undo.filter(c=>c!==b.dataset.tdrop); }
     else return;
-    saveTally(); renderTally();
+    saveCur(); renderTally(); renderCount();
   });
   async function startTallyCam(){
     const L = lib();
@@ -1141,7 +1334,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
       await tallyCam.start({facingMode:"environment"},
         {fps:15, qrbox:(w,h)=>({width:Math.min(300,Math.floor(w*0.85)), height:Math.min(140,Math.floor(h*0.6))})},
         onTally, ()=>{});
-      tallyPaused = false; $("#tallyPause").textContent = "Pause camera";
+      $("#tallyPause").textContent = "Pause camera";
       if(!$("#tallyLast").textContent) $("#tallyLast").textContent = "Scan each item once.";
     }catch(err){
       await stopTallyCam();
@@ -1151,60 +1344,328 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   async function stopTallyCam(){
     if(tallyCam){ try{ if(tallyCam.isScanning) await tallyCam.stop(); }catch(_){} try{ tallyCam.clear(); }catch(_){} tallyCam = null; }
   }
-  $("#tallyBtn").addEventListener("click", ()=>{
+  function openScanner(mode){
+    tallyMode = mode;
     try{ audio = audio || new (window.AudioContext||window.webkitAudioContext)(); audio.resume(); }catch(_){}
-    $("#tallyLast").textContent = tallyScans() ? `Picking up where you left off: ${tallyScans()} scanned.` : "";
-    $("#tallyZero").checked = false;
+    const n = Object.values(cur().codes).reduce((a,b)=>a+b,0);
+    $("#tallyLast").textContent = n ? `Picking up where you left off: ${n} scanned.` : (mode==="put" ? "Scan each item as you put it away." : "");
     renderTally();
     $("#tallyDlg").showModal();
     startTallyCam();
-  });
+  }
+  $("#tallyBtn").addEventListener("click", ()=>openScanner("count"));
   $("#tallyPause").addEventListener("click", async ()=>{
-    if(tallyCam){ await stopTallyCam(); tallyPaused = true; $("#tallyPause").textContent = "Resume camera"; }
+    if(tallyCam){ await stopTallyCam(); $("#tallyPause").textContent = "Resume camera"; }
     else startTallyCam();
   });
   $("#tallyUndo").addEventListener("click", ()=>{
-    const c = tally.undo.pop(); if(!c) return;
-    tally.codes[c] = Math.max(0,(tally.codes[c]||0)-1); if(!tally.codes[c]) delete tally.codes[c];
-    saveTally(); renderTally();
+    const d = cur();
+    const c = d.undo.pop(); if(!c) return;
+    d.codes[c] = Math.max(0,(d.codes[c]||0)-1); if(!d.codes[c]) delete d.codes[c];
+    saveCur(); renderTally(); renderCount();
     const f = findByCode(c); flash("", `Took one off ${f?f.it.name:"that barcode"}.`);
   });
   $("#tallyDlg").addEventListener("close", ()=>{ stopTallyCam(); renderCount(true); });
-  $("#tallyLater").addEventListener("click", ()=>$("#tallyDlg").close());
-  $("#tallyDiscard").addEventListener("click", ()=>{
-    if(!confirm("Throw away everything scanned in this count?")) return;
-    tally = {codes:{}, manual:{}, undo:[]}; saveTally(); $("#tallyDlg").close();
-  });
-  $("#tallyForm").addEventListener("submit", async e=>{
-    e.preventDefault();
-    const zero = $("#tallyZero").checked;
-    const updates = [];
-    items.forEach(it=>{
-      const t = tallyFor(it);
-      if(t.touched) updates.push([it, t.n]);
-      else if(zero) updates.push([it, 0]);
-    });
+  $("#tallyForm").addEventListener("submit", e=>{ e.preventDefault(); $("#tallyDlg").close(); if(tallyMode==="put") openPut(); });
+
+  // ---------- Linking scanned barcodes that aren't tied to an item ----------
+  function unknownCodes(d){
+    d = d || tally;
     const known = new Set(items.flatMap(it=>brandsOf(it).map(b=>b.barcode)));
-    const unknownLeft = Object.keys(tally.codes).filter(c=>!known.has(c)).length;
-    if(!updates.length){ alert("Nothing to save yet."); return; }
-    let msg = `Save counts for ${updates.length} item${updates.length===1?"":"s"}?`;
-    if(zero) msg += " Anything you didn't scan will be set to 0.";
-    if(unknownLeft) msg += ` ${unknownLeft} unknown barcode${unknownLeft===1?"":"s"} won't be counted.`;
-    if(!confirm(msg)) return;
-    await stopTallyCam();
-    if(!countStart) setCountStart(Date.now());
-    const now = Date.now();
-    let failed = 0;
-    for(const [it, n] of updates){
-      pending.delete(it.id);
-      const ok = await write(()=>db.doc("items/"+it.id).update({qty:n, countedAt:now, updatedAt:now}));
-      if(!ok) failed++;
+    return Object.entries(d.codes).filter(([c,n])=>n>0 && !known.has(c));
+  }
+  function linkRows(list, draftName){
+    list.forEach(([c])=>{ if(!(c in lookupCache) && !lookupPending[c]) lookupProduct(c).then(p=>{ if(p) render(); }); });
+    return list.map(([c,n])=>{
+      const p = lookupCache[c], g = guessItem(p);
+      return `<div class="trow">
+        <div><b>${p ? esc(p.name) : "Unknown product"}</b>
+          <div class="meta">${esc(c)}, scanned ${n}${g?`, looks like ${esc(g.name)}`:""}</div></div>
+        <div class="shopbtns"><button type="button" class="btn restock" data-link="${esc(c)}">Link</button>
+          <button type="button" class="del" data-unlink="${esc(c)}" data-draft="${draftName||"count"}">Ignore</button></div></div>`;
+    }).join("");
+  }
+  function renderLinks(){
+    const list = unknownCodes();
+    $("#linkWrap").hidden = !list.length;
+    $("#linkCount").textContent = list.length;
+    if(list.length) $("#linkList").innerHTML = linkRows(list);
+  }
+  function onLinkClick(e){
+    const b = e.target.closest("button"); if(!b) return;
+    if(b.dataset.link) showMiss(b.dataset.link, "link");
+    else if(b.dataset.unlink){
+      if(!confirm("Ignore this barcode? Its scans won't be counted.")) return;
+      const d = draftOf(b.dataset.draft);
+      delete d.codes[b.dataset.unlink]; d.undo = d.undo.filter(c=>c!==b.dataset.unlink);
+      saveDraft(b.dataset.draft); render();
     }
-    if(failed){ flash("miss", `${failed} item${failed===1?"":"s"} didn't save. Try Save counts again.`); startTallyCam(); return; }
-    tally = {codes:{}, manual:{}, undo:[]}; saveTally();
-    $("#tallyDlg").close();
-    banner(`Saved counts for ${updates.length} item${updates.length===1?"":"s"}.`);
-    setTimeout(()=>banner(""), 4000);
+  }
+  $("#linkList").addEventListener("click", onLinkClick);
+  $("#reviewLinkList").addEventListener("click", onLinkClick);
+  $("#putLinkList").addEventListener("click", onLinkClick);
+
+  // ---------- Merge two items into one ----------
+  let mergeSrc = null;
+  const nameWords = w => (w||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>2);
+  function similarity(a, b){
+    const A = new Set([...nameWords(a.name), ...brandsOf(a).flatMap(x=>nameWords(x.name))]);
+    return [...nameWords(b.name), ...brandsOf(b).flatMap(x=>nameWords(x.name))].filter(w=>A.has(w)).length;
+  }
+  function openMerge(src){
+    mergeSrc = src;
+    $("#mergeIntro").textContent = `Combine ${src.name} into another item. Its barcodes, count, and purchase history move over, and ${src.name} is removed.`;
+    const others = items.filter(i=>i.id!==src.id).map(i=>({i, sc:similarity(src,i)}));
+    const sugg = others.filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc || a.i.name.localeCompare(b.i.name));
+    const rest = others.filter(x=>x.sc===0).sort((a,b)=>a.i.name.localeCompare(b.i.name));
+    const opt = ({i}) => `<option value="${i.id}">${esc(i.name)}${brandNames(i)?" ("+esc(brandNames(i))+")":""}</option>`;
+    $("#mergeInto").innerHTML = (sugg.length?`<optgroup label="Looks similar">${sugg.map(opt).join("")}</optgroup>`:"") +
+      (rest.length?`<optgroup label="${sugg.length?"Everything else":"Items"}">${rest.map(opt).join("")}</optgroup>`:"");
+    renderMergePreview();
+    $("#mergeDlg").showModal();
+  }
+  function mergedBrands(t, s){
+    const out = [...brandsOf(t)];
+    brandsOf(s).forEach(b=>{ if(!b.barcode || !out.some(x=>x.barcode===b.barcode)) out.push(b); });
+    return out.filter(b=>b.name||b.barcode);
+  }
+  function renderMergePreview(){
+    const t = items.find(i=>i.id===$("#mergeInto").value), s = mergeSrc;
+    if(!t || !s){ $("#mergePreview").innerHTML = ""; return; }
+    const codes = mergedBrands(t,s).filter(b=>b.barcode).length;
+    const par = t.par || s.par;
+    $("#mergePreview").innerHTML = [
+      ["On hand", `${qtyOf(t)} + ${qtyOf(s)} = ${qtyOf(t)+qtyOf(s)}`],
+      ["Barcodes", `${codes}`],
+      ["Par", par ? String(par) : "none"],
+      ["Cost each", (t.unitCost||s.unitCost) ? money(t.unitCost||s.unitCost) : "none"],
+    ].map(([k,v])=>`<div class="rv"><span>${k}</span><span class="chg">${esc(v)}</span></div>`).join("") +
+      `<div class="rv"><span>Keeps the name</span><span class="chg">${esc(t.name)}</span></div>`;
+  }
+  $("#mergeInto").addEventListener("change", renderMergePreview);
+  $("#iMerge").addEventListener("click", ()=>{ if(!editing) return; const src = editing; $("#itemDlg").close(); openMerge(src); });
+  $("#mergeForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const s = mergeSrc, t = items.find(i=>i.id===$("#mergeInto").value);
+    if(!s || !t) return;
+    if(!confirm(`Merge ${s.name} into ${t.name}? This can't be undone.`)) return;
+    $("#mergeGo").disabled = true;
+    const now = Date.now();
+    const body = {
+      brands: mergedBrands(t, s), barcode: "",
+      qty: qtyOf(t) + qtyOf(s),
+      par: t.par || s.par || 0, low: t.low || s.low || 0,
+      unitCost: t.unitCost || s.unitCost || 0, price: t.price || s.price || 0,
+      category: t.category || s.category || "", updatedAt: now
+    };
+    // Keep a record so the merge can be undone later
+    const {id:_sid, ...srcData} = s;
+    const pick = o => ({brands: brandsOf(o), qty: qtyOf(o), par:o.par||0, low:o.low||0, unitCost:o.unitCost||0, price:o.price||0, category:o.category||""});
+    const tListed = shop.some(x=>x.itemId===t.id);
+    const rec = {
+      at: now, undone: false,
+      srcId: s.id, srcName: s.name, src: JSON.parse(JSON.stringify({...srcData, qty: qtyOf(s)})),
+      targetId: t.id, targetName: t.name, targetBefore: pick(t), targetAfter: {par:body.par, low:body.low, unitCost:body.unitCost, price:body.price, category:body.category},
+      movedPurchases: buys.filter(x=>x.itemId===s.id).map(x=>x.id),
+      movedShop: tListed ? [] : shop.filter(x=>x.itemId===s.id).map(x=>x.id),
+      deletedShop: tListed ? shop.filter(x=>x.itemId===s.id).map(({id,...d})=>d) : []
+    };
+    pending.delete(t.id); pending.delete(s.id);
+    const ok = await write(()=>db.doc("items/"+t.id).update(body));
+    if(!ok){ $("#mergeGo").disabled = false; return; }
+    for(const b of buys.filter(x=>x.itemId===s.id)) await write(()=>db.doc("purchases/"+b.id).update({itemId:t.id, itemName:t.name}));
+    for(const e2 of shop.filter(x=>x.itemId===s.id)){
+      if(tListed) await write(()=>db.doc("shopping/"+e2.id).delete());
+      else await write(()=>db.doc("shopping/"+e2.id).update({itemId:t.id}));
+    }
+    const recRef = await (async()=>{ try{ return await db.collection("merges").add(rec); }catch(_){ return null; } })();
+    // carry over anything typed into an unsubmitted count or put away
+    [[tally, saveTally],[putDraft, savePut]].forEach(([d, save])=>{
+      if(s.id in d.manual){ d.manual[t.id] = (d.manual[t.id]||0) + d.manual[s.id]; delete d.manual[s.id]; }
+      if(s.id in d.par){ if(!(t.id in d.par)) d.par[t.id] = d.par[s.id]; delete d.par[s.id]; }
+      save();
+    });
+    await write(()=>db.doc("items/"+s.id).delete());
+    $("#mergeGo").disabled = false;
+    $("#mergeDlg").close();
+    if(recRef){
+      const el = $("#banner");
+      el.innerHTML = `Merged ${esc(s.name)} into ${esc(t.name)}. <button class="btn ghost" id="undoNow" style="margin-left:8px;padding:6px 12px">Undo</button>`;
+      el.hidden = false;
+      $("#undoNow").addEventListener("click", ()=>{ const m = merges.find(x=>x.id===recRef.id); if(m) undoMerge(m); });
+      clearTimeout(flashBanner.t); flashBanner.t = setTimeout(()=>banner(""), 15000);
+    } else flashBanner(`Merged ${s.name} into ${t.name}.`);
+  });
+
+  // ---------- Undo a merge ----------
+  async function undoMerge(m){
+    if(m.undone) return;
+    const t = items.find(i=>i.id===m.targetId);
+    if(!t){ alert(`${m.targetName} has been deleted, so this merge can't be undone.`); return; }
+    if(items.some(i=>i.id===m.srcId)){ alert(`${m.srcName} is already back.`); return; }
+    if(!confirm(`Undo merge? ${m.srcName} comes back with its own barcodes and ${m.src.qty} on hand, and ${t.name} goes down by ${m.src.qty}.`)) return;
+    const now = Date.now();
+    const srcCodes = new Set((m.src.brands||[]).map(b=>b.barcode).concat(m.src.barcode?[m.src.barcode]:[]).filter(Boolean));
+    const beforeCodes = new Set((m.targetBefore.brands||[]).map(b=>b.barcode).filter(Boolean));
+    const tBody = {
+      brands: brandsOf(t).filter(b=>!b.barcode || !srcCodes.has(b.barcode) || beforeCodes.has(b.barcode)),
+      barcode: "", qty: Math.max(0, qtyOf(t) - (m.src.qty||0)), updatedAt: now
+    };
+    // put back settings the merge filled in, unless someone changed them since
+    ["par","low","unitCost","price","category"].forEach(k=>{ if((t[k]||(k==="category"?"":0)) === m.targetAfter[k]) tBody[k] = m.targetBefore[k]; });
+    // the restored item keeps only its own barcodes, and none that the target had before
+    const srcBody = {...m.src, brands:(m.src.brands||[]).filter(b=>!b.barcode || !beforeCodes.has(b.barcode)), updatedAt: now};
+    pending.delete(t.id);
+    if(!await write(()=>db.doc("items/"+t.id).update(tBody))) return;
+    if(!await write(()=>db.doc("items/"+m.srcId).set(srcBody))) return;
+    for(const id of m.movedPurchases||[]) if(buys.some(b=>b.id===id)) await write(()=>db.doc("purchases/"+id).update({itemId:m.srcId, itemName:m.srcName}));
+    for(const id of m.movedShop||[]) if(shop.some(x=>x.id===id)) await write(()=>db.doc("shopping/"+id).update({itemId:m.srcId}));
+    for(const d of m.deletedShop||[]) await write(()=>db.collection("shopping").add(d));
+    await write(()=>db.doc("merges/"+m.id).update({undone:true, undoneAt:now}));
+    flashBanner(`Undid the merge. ${m.srcName} is back.`);
+  }
+  function renderMergeHist(){
+    $("#mergeHistList").innerHTML = merges.map(m=>{
+      const when = new Date(m.at).toLocaleDateString("en-US",{month:"short",day:"numeric"});
+      return `<div class="trow"><div><b>${esc(m.srcName)}</b> into <b>${esc(m.targetName)}</b><div class="meta">${esc(when)}${m.undone?", undone":""}</div></div>
+        ${m.undone?"":`<button type="button" class="btn ghost restock" data-undo="${m.id}">Undo</button>`}</div>`;
+    }).join("") || `<div class="empty"><p>No merges yet.</p></div>`;
+  }
+  $("#mergeHistBtn").addEventListener("click", ()=>{ renderMergeHist(); $("#mergeHistDlg").showModal(); });
+  $("#mergeHistList").addEventListener("click", e=>{ const b = e.target.closest("[data-undo]"); if(!b) return; const m = merges.find(x=>x.id===b.dataset.undo); if(m) undoMerge(m); });
+
+  // ---------- Put away: add scanned items to stock ----------
+  function putRows(){
+    return items.map(it=>({it, t:tallyFor(it, putDraft)})).filter(x=>x.t.touched && x.t.n>0)
+      .sort((a,b)=>a.it.name.localeCompare(b.it.name));
+  }
+  const putPaid = {};
+  function renderPut(){
+    const rows = putRows();
+    $("#putList").innerHTML = rows.map(({it,t})=>`<div class="prow">
+        <div><b>${esc(it.name)}</b><div class="meta">${t.by.length?esc(t.by.join(", "))+", ":""}${qtyOf(it)} → ${qtyOf(it)+t.n}</div></div>
+        <div class="qty">
+          <button type="button" data-pdec="${it.id}" aria-label="One less ${esc(it.name)}">−</button>
+          <output>+${t.n}</output>
+          <button type="button" data-pinc="${it.id}" aria-label="One more ${esc(it.name)}">+</button>
+        </div>
+        <label class="paid">Paid each <input type="number" min="0" step="0.01" inputmode="decimal" data-paid="${it.id}" value="${putPaid[it.id]??""}" placeholder="${it.unitCost?it.unitCost.toFixed(2):"optional"}"></label>
+      </div>`).join("") || `<div class="empty"><p>Nothing to add yet.</p></div>`;
+    const ul = unknownCodes(putDraft);
+    $("#putLinkWrap").hidden = !ul.length;
+    $("#putUnknown").textContent = `${ul.length} barcode${ul.length===1?" isn't":"s aren't"} linked to an item yet. Link ${ul.length===1?"it":"them"} to add ${ul.length===1?"it":"them"} to stock.`;
+    if(ul.length) $("#putLinkList").innerHTML = linkRows(ul, "put");
+    const total = rows.reduce((s,{t})=>s+t.n,0);
+    $("#putSummary").textContent = total ? `${total} item${total===1?"":"s"} going onto the shelf.` : "";
+    $("#putGo").disabled = !rows.length || readOnly;
+  }
+  function openPut(){ renderPut(); $("#putDlg").showModal(); }
+  $("#putList").addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    if(b.dataset.pinc) putDraft.manual[b.dataset.pinc] = (putDraft.manual[b.dataset.pinc]||0)+1;
+    else if(b.dataset.pdec) putDraft.manual[b.dataset.pdec] = (putDraft.manual[b.dataset.pdec]||0)-1;
+    else return;
+    savePut(); renderPut();
+  });
+  $("#putList").addEventListener("input", e=>{ if(e.target.dataset.paid) putPaid[e.target.dataset.paid] = e.target.value; });
+  $("#putMore").addEventListener("click", ()=>{ $("#putDlg").close(); openScanner("put"); });
+  $("#putDiscard").addEventListener("click", ()=>{
+    if(!confirm("Throw away everything scanned for put away? Stock won't change.")) return;
+    putDraft = emptyDraft(); savePut(); $("#putDlg").close(); render();
+  });
+  $("#putForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const rows = putRows(); if(!rows.length) return;
+    $("#putGo").disabled = true; $("#putGo").textContent = "Adding…";
+    const now = Date.now(), date = today();
+    let failed = 0, added = 0;
+    for(const {it, t} of rows){
+      const paid = num(putPaid[it.id], 0);
+      const body = {qty: qtyOf(it) + t.n, updatedAt: now};
+      if(paid > 0) body.unitCost = Math.round(paid*100)/100;
+      pending.delete(it.id);
+      const ok = await write(()=>db.doc("items/"+it.id).update(body));
+      if(!ok){ failed++; continue; }
+      added += t.n;
+      if(paid > 0) await write(()=>db.collection("purchases").add({itemId:it.id, itemName:it.name, qty:t.n, total:Math.round(paid*t.n*100)/100, date, where:"", createdAt:now}));
+      // bought it, so take it off the hand-added shopping list
+      for(const sEntry of shop.filter(x=>x.itemId===it.id)) await write(()=>db.doc("shopping/"+sEntry.id).delete());
+      delete putDraft.manual[it.id]; delete putPaid[it.id];
+      brandsOf(it).forEach(b=>{ delete putDraft.codes[b.barcode]; });
+    }
+    putDraft.undo = putDraft.undo.filter(c=>c in putDraft.codes);
+    savePut();
+    $("#putGo").disabled = false; $("#putGo").textContent = "Add to stock";
+    if(failed){ renderPut(); banner(`${failed} item${failed===1?"":"s"} didn't save. Check your connection and try again.`); return; }
+    $("#putDlg").close();
+    render();
+    flashBanner(`Added ${added} item${added===1?"":"s"} to stock.`);
+  });
+  $("#putBtn").addEventListener("click", ()=>{
+    const pending = Object.keys(putDraft.codes).length || Object.keys(putDraft.manual).length;
+    if(pending) openPut(); else openScanner("put");
+  });
+
+  // ---------- Submit ----------
+  function buildReview(){
+    const counted = [], untouched = [];
+    items.forEach(it=>{ const t = tallyFor(it); if(t.touched) counted.push([it, t.n]); else untouched.push(it); });
+    const known = new Set(items.flatMap(it=>brandsOf(it).map(b=>b.barcode)));
+    const unknown = Object.keys(tally.codes).filter(c=>!known.has(c));
+    return {counted, untouched, unknown};
+  }
+  function renderReview(){
+    const {counted, untouched, unknown} = buildReview();
+    const zero = $("#reviewZero").checked;
+    const rows = [];
+    counted.sort((a,b)=>a[0].name.localeCompare(b[0].name)).forEach(([it,n])=>{
+      const was = qtyOf(it), d = n - was;
+      rows.push(`<div class="rv"><span>${esc(it.name)}</span><span class="chg ${d>0?"up":d<0?"down":""}">${was} → ${n}</span></div>`);
+    });
+    if(zero) untouched.filter(it=>qtyOf(it)!==0).forEach(it=>rows.push(`<div class="rv"><span>${esc(it.name)} <small class="meta">not counted</small></span><span class="chg down">${qtyOf(it)} → 0</span></div>`));
+    Object.entries(tally.par).forEach(([id,v])=>{ const it = items.find(i=>i.id===id); if(it) rows.push(`<div class="rv"><span>${esc(it.name)} <small class="meta">par</small></span><span class="chg">${it.par||"–"} → ${v||"–"}</span></div>`); });
+    $("#reviewList").innerHTML = rows.join("") || `<div class="empty"><p>Nothing to update.</p></div>`;
+    $("#reviewSummary").textContent = `${counted.length} item${counted.length===1?"":"s"} counted. ${untouched.length} not counted.`;
+    $("#reviewZeroText").textContent = `Set the ${untouched.length} item${untouched.length===1?"":"s"} I didn't count to 0`;
+    $("#reviewZero").parentElement.hidden = !untouched.length;
+    const ul = unknownCodes();
+    $("#reviewLinkWrap").hidden = !ul.length;
+    $("#reviewUnknown").textContent = `${ul.length} scanned barcode${ul.length===1?" isn't":"s aren't"} linked to an item yet. Link ${ul.length===1?"it":"them"} now or ${ul.length===1?"it":"they"} won't be counted.`;
+    if(ul.length) $("#reviewLinkList").innerHTML = linkRows(ul);
+  }
+  $("#submitBtn").addEventListener("click", ()=>{
+    $("#reviewZero").checked = false;
+    renderReview();
+    $("#reviewDlg").showModal();
+  });
+  $("#reviewZero").addEventListener("change", renderReview);
+  $("#reviewForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const {counted, untouched} = buildReview();
+    const zero = $("#reviewZero").checked;
+    const now = Date.now();
+    const updates = new Map();
+    counted.forEach(([it,n])=>updates.set(it.id, {qty:n, countedAt:now}));
+    if(zero) untouched.forEach(it=>updates.set(it.id, {qty:0, countedAt:now}));
+    Object.entries(tally.par).forEach(([id,v])=>{ if(items.some(i=>i.id===id)) updates.set(id, Object.assign(updates.get(id)||{}, {par:v})); });
+    $("#reviewGo").disabled = true; $("#reviewGo").textContent = "Submitting…";
+    let failed = 0;
+    for(const [id, body] of updates){
+      pending.delete(id);
+      const ok = await write(()=>db.doc("items/"+id).update(Object.assign(body, {updatedAt:now})));
+      if(ok){
+        // clear what was saved from the draft
+        const it = items.find(i=>i.id===id);
+        delete tally.manual[id]; delete tally.par[id];
+        if(it) brandsOf(it).forEach(b=>{ delete tally.codes[b.barcode]; });
+      } else failed++;
+    }
+    $("#reviewGo").disabled = false; $("#reviewGo").textContent = "Submit";
+    if(failed){ saveTally(); renderReview(); banner(`${failed} item${failed===1?"":"s"} didn't save. Check your connection and submit again.`); return; }
+    tally = emptyDraft(); saveTally();
+    $("#reviewDlg").close();
+    renderCount(true);
+    flashBanner(`Inventory submitted: ${updates.size} item${updates.size===1?"":"s"} updated.`);
   });
 
   // Shopping list
@@ -1325,6 +1786,24 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
     await write(()=>db.doc("purchases/"+id).delete());
   }
 
+  // ---------- Update check: phones cache the page, so look for a newer version ----------
+  async function checkForUpdate(){
+    try{
+      const res = await fetch(location.pathname + "?check=" + Date.now(), {cache:"no-store"});
+      const text = await res.text();
+      const m = text.match(/const APP_VERSION = "([^"]+)"/);
+      if(m && m[1] !== APP_VERSION){
+        const el = $("#banner");
+        el.innerHTML = `A new version of the app is ready. <button class="btn" id="doUpdate" style="margin-left:8px;padding:6px 12px">Update now</button>`;
+        el.hidden = false;
+        $("#doUpdate").addEventListener("click", ()=>{ location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); });
+      }
+    }catch(_){}
+  }
+  $("#ver").textContent = "v" + APP_VERSION.split(".").pop();
+  checkForUpdate();
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) checkForUpdate(); });
+
   // ---------- Data (Firebase) ----------
   render();
   const configured = FIREBASE_CONFIG && FIREBASE_CONFIG.projectId;
@@ -1344,7 +1823,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   });
   const adapter = {
     collection: name => ({ ...wrapQ(collection(fs, name)), add: data => addDoc(collection(fs, name), data) }),
-    doc: path => { const ref = doc(fs, path); return { update: d => updateDoc(ref, d), delete: () => deleteDoc(ref) }; }
+    doc: path => { const ref = doc(fs, path); return { update: d => updateDoc(ref, d), set: d => setDoc(ref, d), delete: () => deleteDoc(ref) }; }
   };
 
   db = adapter;
@@ -1355,6 +1834,7 @@ import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot
   };
   db.collection("items").onSnapshot(snap=>{ items = snap.docs.map(d=>({id:d.id, ...d.data()})); render(); }, fail);
   db.collection("shopping").onSnapshot(snap=>{ shop = snap.docs.map(d=>({id:d.id, ...d.data()})); render(); }, fail);
+  db.collection("merges").onSnapshot(snap=>{ merges = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); render(); }, fail);
   db.collection("purchases").orderBy("date","desc").limit(500).onSnapshot(snap=>{ buys = snap.docs.map(d=>({id:d.id, ...d.data()})); render(); }, fail);
 })();
 </script>
