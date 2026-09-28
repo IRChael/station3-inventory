@@ -151,6 +151,8 @@ dialog.wide{width:min(560px,calc(100% - 16px))}
 .prow .paid{grid-column:1 / -1;display:flex;align-items:center;gap:8px;margin:0;font-size:14px;font-weight:500;color:var(--muted)}
 .prow .paid input{width:110px;padding:7px 8px}
 #putList{max-height:45vh;overflow-y:auto}
+.newname{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-weight:600;margin-top:4px}
+.newtag{font-size:12px;font-weight:700;color:var(--orange);margin-left:6px}
 .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--orange);color:#fff;font-size:12px;line-height:20px;text-align:center}
 .shoprow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
 .shoprow:first-child{border-top:0}
@@ -211,6 +213,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
       <select id="filter" aria-label="Filter">
         <option value="all">All items</option>
         <option value="low">Running low</option>
+        <option value="nopar">No par set</option>
       </select>
       <button class="btn alt" id="putBtn">Put away</button>
       <button class="btn alt" id="scanBtn">Scan</button>
@@ -514,7 +517,7 @@ dialog input,dialog select{width:100%;padding:10px 12px;border:1px solid var(--l
 
 <script type="module">
 // ================== Firebase settings (Station3 Inventory) ==================
-const APP_VERSION = "2026-09-28.11";
+const APP_VERSION = "2026-09-28.12";
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBjLIMIHjhDO4mdIBQ3B568HluSluI2vBI",
   authDomain: "station3-inventory.firebaseapp.com",
@@ -694,7 +697,7 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
   function renderStock(){
     const q = $("#search").value.trim().toLowerCase();
     const f = $("#filter").value;
-    let list = items.filter(it => (!q || searchText(it).includes(q)) && (f!=="low" || isLow(it)));
+    let list = items.filter(it => (!q || searchText(it).includes(q)) && (f!=="low" || isLow(it)) && (f!=="nopar" || !(it.par>0)));
     const el = $("#stockList");
     if(!db){ el.innerHTML = `<div class="empty"><p>Loading inventory…</p></div>`; return; }
     if(items.length===0){
@@ -1592,7 +1595,11 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
       .sort((a,b)=>a.it.name.localeCompare(b.it.name));
   }
   const putPaid = {};
-  function renderPut(){
+  const putNewNames = {};
+  function renderPut(force){
+    // don't redraw while someone is typing a name or price
+    if(!force && $("#putDlg").open && $("#putDlg").contains(document.activeElement) && document.activeElement.tagName==="INPUT"){ renderPut.dirty = true; return; }
+    renderPut.dirty = false;
     const rows = putRows();
     $("#putList").innerHTML = rows.map(({it,t})=>`<div class="prow">
         <div><b>${esc(it.name)}</b><div class="meta">${t.by.length?esc(t.by.join(", "))+", ":""}${qtyOf(it)} → ${qtyOf(it)+t.n}</div></div>
@@ -1605,13 +1612,43 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
       </div>`).join("") || `<div class="empty"><p>Nothing to add yet.</p></div>`;
     const ul = unknownCodes(putDraft);
     $("#putLinkWrap").hidden = !ul.length;
-    $("#putUnknown").textContent = `${ul.length} barcode${ul.length===1?" isn't":"s aren't"} linked to an item yet. Link ${ul.length===1?"it":"them"} to add ${ul.length===1?"it":"them"} to stock.`;
-    if(ul.length) $("#putLinkList").innerHTML = linkRows(ul, "put");
-    const total = rows.reduce((s,{t})=>s+t.n,0);
-    $("#putSummary").textContent = total ? `${total} item${total===1?"":"s"} going onto the shelf.` : "";
-    $("#putGo").disabled = !rows.length || readOnly;
+    $("#putUnknown").textContent = `New to the app. ${ul.length===1?"It":"These"} will be added to stock as new item${ul.length===1?"":"s"}. Change the name if you want, or tap Link if it's another brand of something you have.`;
+    ul.forEach(([c])=>{ if(!(c in lookupCache) && !lookupPending[c]) lookupProduct(c).then(p=>{ if(p && !(c in putNewNames)) renderPut(); }); });
+    if(ul.length) $("#putLinkList").innerHTML = ul.map(([c,n])=>{
+      const p = lookupCache[c];
+      const name = c in putNewNames ? putNewNames[c] : (p ? p.name : "");
+      const g = guessItem(p);
+      return `<div class="prow">
+        <div><b>${p?esc(p.name):"Unknown product"}</b><span class="newtag">NEW</span>
+          <div class="meta">${esc(c)}${g?`, looks like ${esc(g.name)}`:""}</div>
+          <input class="newname" data-newname="${esc(c)}" value="${esc(name)}" placeholder="Item name" aria-label="Name for new item"></div>
+        <div class="qty">
+          <button type="button" data-ndec="${esc(c)}" aria-label="One less">−</button>
+          <output>+${n}</output>
+          <button type="button" data-ninc="${esc(c)}" aria-label="One more">+</button>
+        </div>
+        <label class="paid">Paid each <input type="number" min="0" step="0.01" inputmode="decimal" data-npaid="${esc(c)}" value="${putPaid["code:"+c]??""}" placeholder="optional"></label>
+        <div class="shopbtns" style="grid-column:1 / -1"><button type="button" class="btn ghost restock" data-link="${esc(c)}">Link to an item instead</button>
+          <button type="button" class="del" data-unlink="${esc(c)}" data-draft="put">Skip</button></div>
+      </div>`;
+    }).join("");
+    const total = rows.reduce((s,{t})=>s+t.n,0) + ul.reduce((s,[,n])=>s+n,0);
+    $("#putSummary").textContent = total ? `${total} item${total===1?"":"s"} going onto the shelf${ul.length?`, including ${ul.length} new`:""}.` : "";
+    $("#putGo").disabled = !total || readOnly;
   }
-  function openPut(){ renderPut(); $("#putDlg").showModal(); }
+  function openPut(){ renderPut(true); $("#putDlg").showModal(); }
+  $("#putDlg").addEventListener("focusout", ()=>setTimeout(()=>{ if(renderPut.dirty && !($("#putDlg").contains(document.activeElement) && document.activeElement.tagName==="INPUT")) renderPut(); },0));
+  $("#putLinkList").addEventListener("input", e=>{
+    if(e.target.dataset.newname !== undefined) putNewNames[e.target.dataset.newname] = e.target.value;
+    if(e.target.dataset.npaid !== undefined) putPaid["code:"+e.target.dataset.npaid] = e.target.value;
+  });
+  $("#putLinkList").addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    const c = b.dataset.ninc || b.dataset.ndec; if(!c) return;
+    putDraft.codes[c] = Math.max(0, (putDraft.codes[c]||0) + (b.dataset.ninc ? 1 : -1));
+    if(!putDraft.codes[c]) delete putDraft.codes[c];
+    savePut(); renderPut(true);
+  });
   $("#putList").addEventListener("click", e=>{
     const b = e.target.closest("button"); if(!b) return;
     if(b.dataset.pinc) putDraft.manual[b.dataset.pinc] = (putDraft.manual[b.dataset.pinc]||0)+1;
@@ -1627,10 +1664,24 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
   });
   $("#putForm").addEventListener("submit", async e=>{
     e.preventDefault();
-    const rows = putRows(); if(!rows.length) return;
+    const rows = putRows();
+    const newCodes = unknownCodes(putDraft);
+    if(!rows.length && !newCodes.length) return;
     $("#putGo").disabled = true; $("#putGo").textContent = "Adding…";
     const now = Date.now(), date = today();
-    let failed = 0, added = 0;
+    let failed = 0, added = 0, created = 0;
+    for(const [c, n] of newCodes){
+      const p = await lookupProduct(c).catch(()=>null);
+      const name = ((c in putNewNames ? putNewNames[c] : (p && p.name)) || "").trim() || `New item ${c}`;
+      const paid = num(putPaid["code:"+c], 0);
+      const body = {name, category:"", qty:n, low:0, par:0, unitCost: paid>0 ? Math.round(paid*100)/100 : 0, price:0,
+        brands:[{name: (p && p.brand) || "", barcode: (p && p.code) || c}], barcode:"", createdAt:now, updatedAt:now};
+      let ref = null;
+      try{ ref = await db.collection("items").add(body); }catch(_){ failed++; continue; }
+      if(paid > 0) await write(()=>db.collection("purchases").add({itemId:ref.id, itemName:name, qty:n, total:Math.round(paid*n*100)/100, date, where:"", createdAt:now}));
+      created++; added += n;
+      delete putDraft.codes[c]; delete putNewNames[c]; delete putPaid["code:"+c];
+    }
     for(const {it, t} of rows){
       const paid = num(putPaid[it.id], 0);
       const body = {qty: qtyOf(it) + t.n, updatedAt: now};
@@ -1651,7 +1702,15 @@ import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, on
     if(failed){ renderPut(); banner(`${failed} item${failed===1?"":"s"} didn't save. Check your connection and try again.`); return; }
     $("#putDlg").close();
     render();
-    flashBanner(`Added ${added} item${added===1?"":"s"} to stock.`);
+    if(created){
+      const el = $("#banner");
+      el.innerHTML = `Added ${added} to stock, including ${created} new item${created===1?"":"s"}. <button class="btn" id="setPars" style="margin-left:8px;padding:6px 12px">Set pars</button>`;
+      el.hidden = false;
+      $("#setPars").addEventListener("click", ()=>{
+        document.querySelector('nav.tabs button[data-tab="stock"]').click();
+        $("#filter").value = "nopar"; renderStock(); banner("");
+      });
+    } else flashBanner(`Added ${added} item${added===1?"":"s"} to stock.`);
   });
   $("#putBtn").addEventListener("click", ()=>{
     const pending = Object.keys(putDraft.codes).length || Object.keys(putDraft.manual).length;
